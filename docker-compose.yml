@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: cibilon
+      POSTGRES_USER: cibilon
+      POSTGRES_PASSWORD: cibilon_dev_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - cibilon_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cibilon -d cibilon"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  cibilon_postgres_data:

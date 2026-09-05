@@ -24,7 +24,6 @@ import { FilterBar } from '@/components/crm/FilterBar';
 import { useToast } from '@/components/ui/Toast';
 import { DOCUMENT_STATUSES } from '@/lib/constants';
 import { formatBytes, formatDate, matchesQuery } from '@/lib/utils';
-import { useMockLoading } from '@/hooks/useMockLoading';
 import { useAuth } from '@/store/AuthContext';
 import { useData } from '@/store/DataContext';
 import type { AppDocument } from '@/types';
@@ -40,8 +39,7 @@ export function Documents() {
   const navigate = useNavigate();
   const toast = useToast();
   const { user } = useAuth();
-  const { applications, documents, replaceDocument } = useData();
-  const loading = useMockLoading();
+  const { applications, documents, replaceDocument, loading } = useData();
   const fileInput = useRef<HTMLInputElement>(null);
 
   const [tab, setTab] = useState('all');
@@ -113,6 +111,7 @@ export function Documents() {
       fileName: file.name,
       fileType: file.type || 'application/octet-stream',
       size: file.size,
+      file,
     });
     setTarget(null);
     toast.success('Document uploaded', 'It has been sent to the verification desk.');

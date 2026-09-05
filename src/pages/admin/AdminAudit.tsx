@@ -22,7 +22,6 @@ import {
 import { useToast } from '@/components/ui/Toast';
 import { AUDIT_MODULES } from '@/lib/constants';
 import { formatDateTime, matchesQuery, relativeTime } from '@/lib/utils';
-import { useMockLoading } from '@/hooks/useMockLoading';
 import { useData } from '@/store/DataContext';
 
 const ROLE_LABELS: Record<string, string> = {
@@ -34,8 +33,7 @@ const ROLE_LABELS: Record<string, string> = {
 export function AdminAudit() {
   const navigate = useNavigate();
   const toast = useToast();
-  const { auditLog, applications } = useData();
-  const loading = useMockLoading();
+  const { auditLog, applications, loading } = useData();
 
   const [query, setQuery] = useState('');
   const [module, setModule] = useState('');

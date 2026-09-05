@@ -23,7 +23,6 @@ import {
 import { useToast } from '@/components/ui/Toast';
 import { APPLICATION_STATUSES, LEAD_STAGES, SERVICES } from '@/lib/constants';
 import { formatCurrency, formatDate, matchesQuery, relativeTime } from '@/lib/utils';
-import { useMockLoading } from '@/hooks/useMockLoading';
 import { useData } from '@/store/DataContext';
 import type { Application, LeadStage } from '@/types';
 
@@ -44,8 +43,7 @@ function inTab(lead: Application, tab: string): boolean {
 export function AdminLeads() {
   const navigate = useNavigate();
   const toast = useToast();
-  const { applications, advisors, updateLeadStage } = useData();
-  const loading = useMockLoading();
+  const { applications, advisors, updateLeadStage, loading } = useData();
 
   const [tab, setTab] = useState('all');
   const [query, setQuery] = useState('');

@@ -98,9 +98,9 @@ export function Support() {
   // Keep the open thread in sync with new replies.
   const current = active ? (mine.find((t) => t.id === active.id) ?? active) : null;
 
-  const submit = () => {
+  const submit = async () => {
     if (!form.subject.trim() || !form.category || !form.body.trim()) return;
-    const ticket = createTicket({
+    const ticket = await createTicket({
       advisorId: user!.id,
       advisorName: user!.name,
       subject: form.subject.trim(),
@@ -115,9 +115,9 @@ export function Support() {
     toast.success('Ticket raised', `${ticket.id} is with the support desk.`);
   };
 
-  const sendReply = () => {
+  const sendReply = async () => {
     if (!current || !reply.trim()) return;
-    replyToTicket(current.id, reply.trim(), user!.name, 'advisor');
+    await replyToTicket(current.id, reply.trim(), user!.name, 'advisor');
     setReply('');
     toast.success('Reply sent', `Added to ${current.id}.`);
   };

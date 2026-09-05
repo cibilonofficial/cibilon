@@ -12,10 +12,12 @@ export interface UploadedFile {
   fileName: string;
   fileType: string;
   size: number;
-  /** 0–100. 100 means the mock upload finished. */
+  /** 0–100. Selected files are sent to the API when the form is submitted. */
   progress: number;
   status: DocumentStatus;
   required: boolean;
+  /** Browser file retained until it is sent as multipart data to the API. */
+  file?: File;
 }
 
 const ACCEPT = '.pdf,.jpg,.jpeg,.png';
@@ -169,20 +171,6 @@ export function UploadRow({ file, onRemove, onReplace }: UploadRowProps) {
       </div>
     </div>
   );
-}
-
-/**
- * Simulates an upload with progress ticks. Replace the interval with real
- * XHR/fetch progress events when the upload endpoint exists.
- */
-export function simulateUpload(onTick: (progress: number) => void): () => void {
-  let progress = 0;
-  const timer = setInterval(() => {
-    progress = Math.min(100, progress + 12 + Math.round(Math.random() * 18));
-    onTick(progress);
-    if (progress >= 100) clearInterval(timer);
-  }, 140);
-  return () => clearInterval(timer);
 }
 
 export function validateFile(file: File): string | null {

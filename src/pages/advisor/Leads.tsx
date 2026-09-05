@@ -20,7 +20,6 @@ import {
 import { FilterBar } from '@/components/crm/FilterBar';
 import { APPLICATION_STATUSES, LEAD_STAGES, SERVICES } from '@/lib/constants';
 import { formatCurrency, formatDate, matchesQuery } from '@/lib/utils';
-import { useMockLoading } from '@/hooks/useMockLoading';
 import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/store/AuthContext';
 import { useData } from '@/store/DataContext';
@@ -29,8 +28,7 @@ export function Leads() {
   const navigate = useNavigate();
   const toast = useToast();
   const { user } = useAuth();
-  const { applications } = useData();
-  const loading = useMockLoading();
+  const { applications, loading } = useData();
 
   const [query, setQuery] = useState('');
   const [stage, setStage] = useState('');

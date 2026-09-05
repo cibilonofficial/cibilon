@@ -1,6 +1,6 @@
 /** Domain model for the Cibilon CRM. */
 
-export type Role = 'advisor' | 'admin';
+export type Role = 'advisor' | 'admin' | 'staff';
 
 export interface AuthUser {
   id: string;
@@ -8,6 +8,7 @@ export interface AuthUser {
   email: string;
   mobile: string;
   role: Role;
+  permissions: string[];
   /** DSA code for advisors, employee code for admins. */
   code: string;
   agency?: string;
@@ -135,6 +136,8 @@ export interface Payout {
   payoutAmount: number;
   /** Commission as a percentage of the disbursed amount. */
   payoutRate: number;
+  /** True while the application is approved but not yet disbursed. */
+  estimated: boolean;
   disbursementDate: string | null;
   status: PayoutStatus;
   paymentDate: string | null;
@@ -143,6 +146,7 @@ export interface Payout {
 
 export interface Application {
   id: string;
+  customerId?: string;
   leadId: string;
   advisorId: string;
   advisorName: string;
@@ -241,6 +245,8 @@ export interface StaffMember {
   status: 'Active' | 'Inactive';
   joinedOn: string;
   avatarColor: string;
+  /** Used only while creating a staff account; never returned by the API. */
+  initialPassword?: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -272,6 +278,8 @@ export interface Lender {
 /* ------------------------------------------------------------------ */
 
 export interface ProductConfig {
+  /** Backend catalog identifier. */
+  id?: string;
   service: ServiceType;
   active: boolean;
   tagline: string;

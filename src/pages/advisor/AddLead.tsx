@@ -21,7 +21,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody, CardHeader, DetailItem } from '@/components/ui/Card';
 import { Checkbox, Input, RadioCards, Select, Textarea } from '@/components/ui/Field';
-import { Dropzone, UploadRow, simulateUpload, validateFile } from '@/components/ui/FileUpload';
+import { Dropzone, UploadRow, validateFile } from '@/components/ui/FileUpload';
 import type { UploadedFile } from '@/components/ui/FileUpload';
 import { ConfirmDialog } from '@/components/ui/Modal';
 import { PageHeader, ProgressBar, SectionTitle } from '@/components/ui/Misc';
@@ -31,11 +31,10 @@ import { useToast } from '@/components/ui/Toast';
 import {
   DOCUMENT_CHECKLIST,
   INDIAN_STATES,
-  LENDERS,
+  LOAN_SERVICES,
   LOAN_PURPOSES,
   SERVICES,
 } from '@/lib/constants';
-import { computePayout, isLoanService } from '@/data/mockData';
 import { cn, formatCurrency, maskId, uid } from '@/lib/utils';
 import {
   EMPTY_CUSTOMER,
@@ -59,6 +58,8 @@ const STEPS = [
   'Documents',
   'Review',
 ];
+
+const isLoanService = (service: ServiceType | '') => LOAN_SERVICES.includes(service as ServiceType);
 
 const SERVICE_ICONS: Record<ServiceType, typeof Banknote> = {
   'Personal Loan': Banknote,
@@ -93,7 +94,8 @@ export function AddLead() {
   const navigate = useNavigate();
   const toast = useToast();
   const { user } = useAuth();
-  const { submitApplication, applicationById } = useData();
+  const { submitApplication, saveDraft, applicationById, lenders, productFor } = useData();
+  const lenderOptions = lenders.filter((lender) => lender.status === 'Active').map((lender) => lender.name);
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('edit');
 
@@ -245,9 +247,10 @@ export function AddLead() {
         fileName: file.name,
         fileType: file.type || 'application/octet-stream',
         size: file.size,
-        progress: 0,
+        progress: 100,
         status: 'Uploaded',
         required: checklist.find((c) => c.name === openSlot)?.required ?? false,
+        file,
       });
     });
 
@@ -260,17 +263,6 @@ export function AddLead() {
     ]);
     setErrors((prev) => ({ ...prev, documents: '' }));
 
-    accepted.forEach((file) => {
-      simulateUpload((progress) => {
-        setUploads((prev) =>
-          prev.map((u) =>
-            u.id === file.id
-              ? { ...u, progress, status: progress === 100 ? 'Under Verification' : 'Uploaded' }
-              : u,
-          ),
-        );
-      });
-    });
   };
 
   const removeUpload = (id: string) => {
@@ -279,34 +271,43 @@ export function AddLead() {
 
   const doSubmit = async () => {
     setSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 900));
-    const application = submitApplication({
-      customer: { ...customer, pan: customer.pan.toUpperCase() },
-      employment: { ...employment, ifsc: employment.ifsc.toUpperCase() },
-      serviceDetails: details,
-      advisorId: user!.id,
-      advisorName: user!.name,
-      documents: uploads
-        .filter((u) => u.progress === 100)
-        .map((u) => ({
-          name: u.name,
-          fileName: u.fileName,
-          fileType: u.fileType,
-          size: u.size,
-          uploadedAt: new Date().toISOString(),
-          status: 'Under Verification' as const,
-          remarks: '',
-          required: u.required,
-        })),
-    });
-    setSubmitting(false);
-    setConfirmOpen(false);
-    setCreatedId(application.id);
-    toast.success('Application submitted', `${application.id} is now with the verification desk.`);
+    try {
+      const application = await submitApplication({
+        customer: { ...customer, pan: customer.pan.toUpperCase() },
+        employment: { ...employment, ifsc: employment.ifsc.toUpperCase() },
+        serviceDetails: details,
+        advisorId: user!.id,
+        advisorName: user!.name,
+        documents: uploads
+          .filter((u) => u.progress === 100)
+          .map((u) => ({
+            name: u.name, fileName: u.fileName, fileType: u.fileType, size: u.size,
+            uploadedAt: new Date().toISOString(), status: 'Under Verification' as const,
+            remarks: '', required: u.required, file: u.file,
+          })),
+      });
+      setConfirmOpen(false);
+      setCreatedId(application.id);
+      toast.success('Application submitted', `${application.id} is now with the verification desk.`);
+    } catch (error) {
+      toast.error('Submission failed', error instanceof Error ? error.message : 'Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const estimatedPayout = service
-    ? computePayout(service, Number(details.loanAmount || 0))
+  const doSaveDraft = async () => {
+    try {
+      const id = await saveDraft({ customer, employment, serviceDetails: details });
+      toast.success('Draft saved', `Draft ${id} is available in your Leads list.`);
+    } catch (error) {
+      toast.error('Could not save draft', error instanceof Error ? error.message : 'Please try again.');
+    }
+  };
+
+  const payoutProduct = service ? productFor(service) : undefined;
+  const estimatedPayout = payoutProduct
+    ? payoutProduct.flatPayout ?? Math.round(Number(details.loanAmount || 0) * payoutProduct.payoutRate) / 100
     : 0;
 
   const resetForm = () => {
@@ -339,9 +340,7 @@ export function AddLead() {
           <Button
             variant="secondary"
             icon={<Save className="size-4" />}
-            onClick={() =>
-              toast.success('Draft saved', 'You can pick this up from your Leads list.')
-            }
+            onClick={() => void doSaveDraft()}
           >
             Save as draft
           </Button>
@@ -416,7 +415,7 @@ export function AddLead() {
             <StepService value={details.service} error={errors.service} onChange={(v) => setDetailField('service', v)} />
           )}
           {step === 3 && (
-            <StepDetails details={details} errors={errors} onChange={setDetailField} />
+            <StepDetails details={details} errors={errors} lenderOptions={lenderOptions} onChange={setDetailField} />
           )}
           {step === 4 && (
             <StepDocuments
@@ -922,10 +921,12 @@ function StepService({
 function StepDetails({
   details,
   errors,
+  lenderOptions,
   onChange,
 }: {
   details: ServiceDetails;
   errors: Errors;
+  lenderOptions: string[];
   onChange: <K extends keyof ServiceDetails>(key: K, value: ServiceDetails[K]) => void;
 }) {
   const service = details.service as ServiceType;
@@ -984,7 +985,7 @@ function StepDetails({
             />
             <Select
               label="Preferred bank / NBFC"
-              options={LENDERS}
+              options={lenderOptions}
               hint="Optional — we will match the best fit if left blank"
               value={details.preferredLender}
               onChange={(e) => onChange('preferredLender', e.target.value)}
@@ -1041,7 +1042,7 @@ function StepDetails({
           />
           <Select
             label="Preferred issuer"
-            options={LENDERS}
+            options={lenderOptions}
             value={details.preferredLender}
             onChange={(e) => onChange('preferredLender', e.target.value)}
           />

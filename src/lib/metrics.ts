@@ -127,3 +127,37 @@ export function advisorRollup(
       .reduce((sum, p) => sum + p.payoutAmount, 0),
   };
 }
+
+/** Six calendar months derived from API-backed application and payout records. */
+export function monthlyTrend(applications: Application[], payouts: Payout[]) {
+  const now = new Date();
+  const rows = Array.from({ length: 6 }, (_, offset) => {
+    const date = new Date(now.getFullYear(), now.getMonth() - (5 - offset), 1);
+    return {
+      key: `${date.getFullYear()}-${date.getMonth()}`,
+      month: date.toLocaleDateString('en-IN', { month: 'short' }),
+      submitted: 0,
+      disbursed: 0,
+      payout: 0,
+    };
+  });
+  const byKey = new Map(rows.map((row) => [row.key, row]));
+  applications.forEach((application) => {
+    const created = new Date(application.createdAt);
+    const submitted = byKey.get(`${created.getFullYear()}-${created.getMonth()}`);
+    if (submitted) submitted.submitted += 1;
+    if (COMPLETED_STATUSES.includes(application.status)) {
+      const closed = new Date(application.updatedAt);
+      const row = byKey.get(`${closed.getFullYear()}-${closed.getMonth()}`);
+      if (row) row.disbursed += 1;
+    }
+  });
+  payouts.forEach((payout) => {
+    const iso = payout.paymentDate ?? payout.disbursementDate;
+    if (!iso) return;
+    const date = new Date(iso);
+    const row = byKey.get(`${date.getFullYear()}-${date.getMonth()}`);
+    if (row) row.payout += payout.payoutAmount;
+  });
+  return rows.map(({ key: _key, ...row }) => row);
+}

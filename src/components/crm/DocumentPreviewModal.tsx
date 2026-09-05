@@ -8,7 +8,9 @@ import { Modal } from '@/components/ui/Modal';
 import { DocStatusBadge } from '@/components/ui/StatusBadge';
 import { useToast } from '@/components/ui/Toast';
 import { formatBytes, formatDateTime } from '@/lib/utils';
+import { apiDownload, errorMessage } from '@/lib/api';
 import { useData } from '@/store/DataContext';
+import { useAuth } from '@/store/AuthContext';
 import type { AppDocument, Role } from '@/types';
 
 interface DocumentPreviewModalProps {
@@ -19,12 +21,7 @@ interface DocumentPreviewModalProps {
   customerName?: string;
 }
 
-/**
- * Single place where a document is previewed and actioned. The admin desk can
- * verify, reject or bounce it back; the advisor can replace the file. There is
- * no real storage behind the mock data, so the "preview" renders the file
- * metadata rather than the bytes.
- */
+/** Shared document metadata, download, verification, rejection and re-upload dialog. */
 export function DocumentPreviewModal({
   document: doc,
   onClose,
@@ -32,10 +29,12 @@ export function DocumentPreviewModal({
   customerName,
 }: DocumentPreviewModalProps) {
   const toast = useToast();
+  const { user } = useAuth();
   const { setDocumentStatus, replaceDocument } = useData();
   const fileInput = useRef<HTMLInputElement>(null);
   const [remarks, setRemarks] = useState('');
   const [mode, setMode] = useState<'view' | 'reject' | 'reupload'>('view');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setRemarks('');
@@ -45,25 +44,33 @@ export function DocumentPreviewModal({
   if (!doc) return null;
 
   const isImage = doc.fileType.startsWith('image/');
-  const isAdmin = role === 'admin';
+  const isAdmin = role === 'admin' || (role === 'staff' && Boolean(user?.permissions.includes('documents:verify')));
 
-  const verify = () => {
-    setDocumentStatus(doc.id, 'Verified', '');
-    toast.success('Document verified', `${doc.name} on ${doc.applicationId}`);
-    onClose();
+  const verify = async () => {
+    setSaving(true);
+    try {
+      await setDocumentStatus(doc.id, 'Verified', '');
+      toast.success('Document verified', doc.name);
+      onClose();
+    } catch (error) { toast.error('Verification failed', errorMessage(error)); }
+    finally { setSaving(false); }
   };
 
-  const commit = (status: 'Rejected' | 'Re-upload Required') => {
+  const commit = async (status: 'Rejected' | 'Re-upload Required') => {
     const fallback =
       status === 'Rejected'
         ? 'Document does not match the applicant details on record.'
         : 'Please upload a clearer copy of this document.';
-    setDocumentStatus(doc.id, status, remarks || fallback);
+    setSaving(true);
+    try {
+    await setDocumentStatus(doc.id, status, remarks || fallback);
     toast.warning(
       status === 'Rejected' ? 'Document rejected' : 'Re-upload requested',
       `The advisor has been notified about ${doc.name}.`,
     );
     onClose();
+    } catch (error) { toast.error('Document update failed', errorMessage(error)); }
+    finally { setSaving(false); }
   };
 
   const onFilePicked = (files: FileList | null) => {
@@ -78,9 +85,22 @@ export function DocumentPreviewModal({
       fileName: file.name,
       fileType: file.type || 'application/octet-stream',
       size: file.size,
+      file,
     });
     toast.success('Document uploaded', 'It has been sent to the verification desk.');
     onClose();
+  };
+
+  const openOriginal = async () => {
+    try {
+      const { blob, fileName } = await apiDownload(`/documents/${doc.id}/download`);
+      const url = URL.createObjectURL(blob);
+      const anchor = window.document.createElement('a');
+      anchor.href = url; anchor.download = fileName; anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (requestError) {
+      toast.error('Download failed', errorMessage(requestError));
+    }
   };
 
   return (
@@ -108,6 +128,7 @@ export function DocumentPreviewModal({
                 variant="success"
                 icon={<CheckCircle2 className="size-4" />}
                 disabled={!doc.fileName || doc.status === 'Verified'}
+                loading={saving}
                 onClick={verify}
               >
                 Verify
@@ -120,6 +141,7 @@ export function DocumentPreviewModal({
               </Button>
               <Button
                 variant={mode === 'reject' ? 'danger' : 'primary'}
+                loading={saving}
                 onClick={() => commit(mode === 'reject' ? 'Rejected' : 'Re-upload Required')}
               >
                 {mode === 'reject' ? 'Reject document' : 'Send back to advisor'}
@@ -131,9 +153,9 @@ export function DocumentPreviewModal({
             <Button variant="secondary" onClick={onClose}>
               Close
             </Button>
-            <Button onClick={() => fileInput.current?.click()}>
+            {role === 'advisor' && <Button onClick={() => fileInput.current?.click()}>
               {doc.fileName ? 'Replace file' : 'Upload file'}
-            </Button>
+            </Button>}
           </>
         )
       }
@@ -156,7 +178,7 @@ export function DocumentPreviewModal({
                 size="sm"
                 className="mt-2"
                 icon={<Download className="size-3.5" />}
-                onClick={() => toast.info('Opening document', `${doc.fileName} is downloading.`)}
+                onClick={() => void openOriginal()}
               >
                 Open original
               </Button>

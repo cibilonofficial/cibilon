@@ -1,11 +1,24 @@
-# Cibilon — Loan & Financial Services CRM (frontend)
+# Cibilon — Loan & Financial Services CRM
 
-A production-shaped frontend prototype for a loan-processing company's advisor CRM. It covers the
+A full-stack loan-processing advisor CRM. It covers the
 whole workflow — **Advisor login → lead capture → service selection → document upload → submission →
 admin processing → status updates → payout** — plus a Super Admin operations console.
 
-Everything runs on mock data held in React state. There is no backend, no database and no third-party
-integration; the UI behaves as if the API already exists.
+The React frontend is connected to the Express/
+PostgreSQL foundation, authentication and RBAC from Phase 1; customer, lead, draft, activity,
+follow-up, and conversion APIs from Phase 2; application processing, assignment, controlled status,
+remarks, timeline, notification, and workload APIs from Phase 3; and secure document storage,
+versioning, download, rejection, and verification APIs from Phase 4. Phase 5 adds advisor bank and
+profile administration, role-aware staff management, lender and product configuration, eligibility,
+document checklists, turnaround settings, lender mapping, and immutable versioned commission rules.
+Phase 6 adds atomic payout generation on disbursal, version-pinned commission calculations, bulk
+payout processing, per-user notifications, and advisor-owned support tickets with staff assignment
+and message threads. Phase 7 adds dashboard/report APIs, permission-aware global search, asynchronous
+CSV/PDF exports, and live frontend authentication, data, uploads, drafts, password recovery/change,
+support, notification, and reporting flows. Phase 8 adds production security gates, configurable
+rate limiting/CORS, encrypted local documents, health/readiness/metrics endpoints, automated unit
+and integration tests, backup tooling, and container deployment assets. Phase 9 adds pooled/direct
+Neon PostgreSQL configuration and safe connection verification.
 
 ## Running it
 
@@ -17,15 +30,64 @@ npm install
 npm run dev
 ```
 
-The app serves on http://localhost:5173.
+In separate terminals, start the API and export worker:
+
+```bash
+npm run dev:api
+npm run dev:worker
+```
+
+The app serves on http://localhost:5173 and the API on http://127.0.0.1:4000.
 
 ```bash
 npm run build
 ```
 
+Run the complete isolated test suite:
+
+```bash
+npm test
+```
+
+## Phase 1 backend
+
+The backend is a modular Express monolith under `server/src`, using PostgreSQL and Prisma. See
+[`docs/phase-1-backend.md`](docs/phase-1-backend.md) for setup, API contracts, seed accounts, and
+manual verification steps.
+
+```bash
+docker compose up -d postgres
+npm run db:migrate:deploy
+npm run db:seed
+npm run dev:api
+```
+
+The API serves on http://127.0.0.1:4000 and the health endpoint is
+`GET /api/v1/health`.
+
+Phase documentation:
+
+- [`docs/api-reference.md`](docs/api-reference.md)
+- [`docs/phase-1-backend.md`](docs/phase-1-backend.md)
+- [`docs/phase-2-backend.md`](docs/phase-2-backend.md)
+- [`docs/phase-3-backend.md`](docs/phase-3-backend.md)
+- [`docs/phase-4-backend.md`](docs/phase-4-backend.md)
+- [`docs/phase-5-backend.md`](docs/phase-5-backend.md)
+- [`docs/phase-6-backend.md`](docs/phase-6-backend.md)
+- [`docs/phase-7-backend.md`](docs/phase-7-backend.md)
+- [`docs/phase-8-security-deployment.md`](docs/phase-8-security-deployment.md)
+- [`docs/phase-9-neon.md`](docs/phase-9-neon.md)
+
+Production environment, security, backup, monitoring, migration, and Docker instructions are in
+the Phase 8 runbook. The quick container deployment uses:
+
+```bash
+docker compose -f docker-compose.production.yml --env-file .env.production up --build -d
+```
+
 ### Demo accounts
 
-Both use the password `cibilon@123`. The login page has one-click buttons for each.
+Both use `SEED_DEFAULT_PASSWORD` from the environment (the development example is `cibilon@123`).
 
 | Role | Email |
 | --- | --- |
@@ -44,7 +106,7 @@ The session persists in `localStorage` when "Remember me" is ticked, `sessionSto
   meetings, emails, notes), document readiness and a jump to the application
 - Add New Lead — 6-step wizard (customer → employment → service → service details → documents →
   review) with per-step validation, service-driven conditional fields, an indicative EMI calculator,
-  drag-and-drop upload with progress, and a generated Application ID on submit
+  multipart document upload, draft saving, and a generated Application ID on submit
 - Applications — tabbed views, filters, per-file document-completeness bars
 - Application details — customer/employment/service panels, document list with re-upload, a visual
   pipeline timeline that highlights the current stage, activity log, payout panel
@@ -96,38 +158,15 @@ src/
     ui/          Button, Field (Input/Select/Textarea/RadioCards/Checkbox), Card, Table,
                  StatusBadge, StatCard, Modal + ConfirmDialog, Toast, Pagination, FileUpload,
                  Timeline + Stepper, Feedback (Skeleton/EmptyState), Misc (Avatar/Tabs/Progress)
-  data/          mockData.ts (advisors, applications, documents, payouts, notifications),
-                 team.ts, lenders.ts, products.ts, audit.ts, support.ts
-  hooks/         useMockLoading — stands in for a query's pending state so skeletons are exercised
-  lib/           constants.ts (statuses, tones, checklists, payout rates), metrics.ts, utils.ts
+  data/          Legacy prototype fixtures retained for visual reference; not imported at runtime
+  lib/           api.ts (authenticated API client), constants.ts, metrics.ts, utils.ts
   pages/         auth/ · advisor/ · admin/ · shared/ (ApplicationDetails, LeadDetails,
                  Notifications)
-  store/         AuthContext (login/logout) · DataContext (all CRM state + actions)
+  store/         AuthContext (login/refresh/logout) · DataContext (API-backed CRM state + actions)
   types/         Domain model
 ```
 
-## Wiring a backend in later
-
-The seams are deliberate:
-
-- **Auth** — `AuthContext.login` is a `Promise<string | null>` that sleeps and matches against
-  `DEMO_ACCOUNTS`. Replace the body with a `fetch` to `POST /auth/login`; nothing else changes.
-- **Data** — every mutation lives on `DataContext` (`submitApplication`, `updateApplicationStatus`,
-  `replaceDocument`, `setDocumentStatus`, `requestDocument`, `assignApplication`, `updateLeadStage`,
-  `saveLender`, `updateProduct`, `updatePayoutStatus`, …). Each is a single `useCallback`
-  operating on local state; swap each for an API call plus a refetch, or drop the whole provider in
-  favour of TanStack Query and keep the same function signatures.
-- **Uploads** — `simulateUpload()` in `components/ui/FileUpload.tsx` ticks a fake progress bar.
-  Replace it with real XHR/fetch progress events; the `UploadedFile` shape already carries
-  `progress`, `status` and `size`.
-- **Seed data** — everything in `data/` is imported only by `DataContext`. Swapping the seeds for an
-  API hydration is a one-file change.
-- **Audit trail** — `DataContext` writes an `AuditEntry` for every mutation, attributed to whoever
-  `setAuditActor` last recorded (the layout sets it from the session). Point `pushAudit` at the API
-  and the console keeps working unchanged.
-- **Loading states** — `useMockLoading()` is used wherever a query's `isLoading` will go.
-
-## Deliberately out of scope for this phase
+## Deliberately out of scope
 
 Public marketing site, advisor registration, subscription plans, payment gateway, real lender/bank
-APIs, real KYC, real SMS/WhatsApp notifications, backend and database.
+APIs, real KYC, and real SMS/WhatsApp notifications.

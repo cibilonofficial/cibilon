@@ -21,18 +21,15 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { PageHeader, ProgressBar } from '@/components/ui/Misc';
 import { TBody, TD, TH, THead, TR, TableWrap, MobileCardList, MobileRow } from '@/components/ui/Table';
 import { PayoutTrend, StatusDonut, VolumeBars } from '@/components/charts/Charts';
-import { MONTHLY_TREND } from '@/data/mockData';
-import { computeMetrics, statusDistribution } from '@/lib/metrics';
+import { computeMetrics, monthlyTrend, statusDistribution } from '@/lib/metrics';
 import { formatCompactCurrency, formatCurrency, formatDate, relativeTime } from '@/lib/utils';
-import { useMockLoading } from '@/hooks/useMockLoading';
 import { useAuth } from '@/store/AuthContext';
 import { useData } from '@/store/DataContext';
 
 export function AdvisorDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { applications, documents, payouts, notifications } = useData();
-  const loading = useMockLoading();
+  const { applications, documents, payouts, notifications, loading } = useData();
 
   const advisorId = user!.id;
   const mine = useMemo(
@@ -44,6 +41,7 @@ export function AdvisorDashboard() {
     [mine, documents, payouts],
   );
   const distribution = useMemo(() => statusDistribution(mine), [mine]);
+  const trend = useMemo(() => monthlyTrend(mine, payouts.filter((p) => p.advisorId === advisorId)), [mine, payouts, advisorId]);
 
   const recent = useMemo(
     () => [...mine].sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt)).slice(0, 6),
@@ -165,7 +163,7 @@ export function AdvisorDashboard() {
             subtitle="Last six months of your pipeline"
           />
           <CardBody>
-            <VolumeBars data={MONTHLY_TREND} />
+            <VolumeBars data={trend} />
           </CardBody>
         </Card>
 
@@ -310,7 +308,7 @@ export function AdvisorDashboard() {
           <Card>
             <CardHeader title="Payout trend" subtitle="Rolling six-month earnings" />
             <CardBody>
-              <PayoutTrend data={MONTHLY_TREND} />
+              <PayoutTrend data={trend} />
               <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
                 <ProgressBar
                   value={metrics.paidPayout}

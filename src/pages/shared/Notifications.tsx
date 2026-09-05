@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Bell,
-  BellOff,
   CheckCheck,
   CircleCheckBig,
   FileWarning,
@@ -13,7 +12,6 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/Feedback';
-import { ConfirmDialog } from '@/components/ui/Modal';
 import { PageHeader, Tabs } from '@/components/ui/Misc';
 import { useToast } from '@/components/ui/Toast';
 import { cn, formatDateTime, relativeTime } from '@/lib/utils';
@@ -36,14 +34,11 @@ export function Notifications() {
   const navigate = useNavigate();
   const toast = useToast();
   const { user } = useAuth();
-  const { notifications, markNotificationRead, markAllNotificationsRead, clearNotifications } =
-    useData();
+  const { notifications, markNotificationRead, markAllNotificationsRead } = useData();
 
   const [tab, setTab] = useState('all');
-  const [clearOpen, setClearOpen] = useState(false);
-
   const role = user!.role;
-  const base = role === 'admin' ? '/admin' : '/app';
+  const base = role === 'admin' ? '/admin' : role === 'staff' ? '/staff' : '/app';
 
   const mine = useMemo(
     () =>
@@ -90,14 +85,6 @@ export function Notifications() {
               }}
             >
               Mark all read
-            </Button>
-            <Button
-              variant="ghost"
-              icon={<BellOff className="size-4" />}
-              disabled={mine.length === 0}
-              onClick={() => setClearOpen(true)}
-            >
-              Clear all
             </Button>
           </>
         }
@@ -180,19 +167,6 @@ export function Notifications() {
         )}
       </Card>
 
-      <ConfirmDialog
-        open={clearOpen}
-        title="Clear all notifications?"
-        message="This removes every notification from your inbox. It cannot be undone in this prototype."
-        confirmLabel="Clear all"
-        tone="danger"
-        onConfirm={() => {
-          clearNotifications(role);
-          setClearOpen(false);
-          toast.success('Notifications cleared');
-        }}
-        onCancel={() => setClearOpen(false)}
-      />
     </>
   );
 }

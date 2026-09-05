@@ -47,6 +47,21 @@ export const APPLICATION_STATUSES: ApplicationStatus[] = [
   'Completed',
 ];
 
+/** Valid next statuses for each current status (mirrors backend transition graph). */
+export const APPLICATION_STATUS_TRANSITIONS: Record<ApplicationStatus, ApplicationStatus[]> = {
+  Draft: ['Submitted', 'Rejected'],
+  Submitted: ['Under Review', 'Documents Required', 'Submitted to Lender', 'Processing', 'Approved', 'Rejected'],
+  'Under Review': ['Documents Required', 'Submitted to Lender', 'Processing', 'Approved', 'Rejected'],
+  'Documents Required': ['Under Review', 'Submitted to Lender', 'Processing', 'Approved', 'Rejected'],
+  Processing: ['Under Review', 'Documents Required', 'Submitted to Lender', 'Approved', 'Rejected'],
+  'Submitted to Lender': ['Under Review', 'Documents Required', 'Processing', 'Approved', 'Rejected'],
+  'Additional Information Required': ['Under Review', 'Submitted to Lender', 'Processing', 'Approved', 'Rejected'],
+  Approved: ['Disbursed', 'Rejected'],
+  Rejected: [],
+  Disbursed: [],
+  Completed: [],
+};
+
 export const DOCUMENT_STATUSES: DocumentStatus[] = [
   'Pending',
   'Uploaded',

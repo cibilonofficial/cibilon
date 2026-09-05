@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Power, UserRoundCheck, Users } from 'lucide-react';
+import { Building2, Plus, Power, UserRoundCheck, Users } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState, TableSkeleton } from '@/components/ui/Feedback';
-import { ConfirmDialog } from '@/components/ui/Modal';
+import { Input } from '@/components/ui/Field';
+import { ConfirmDialog, Modal } from '@/components/ui/Modal';
 import { Chip } from '@/components/ui/StatusBadge';
 import { Avatar, PageHeader } from '@/components/ui/Misc';
 import { StatCard } from '@/components/ui/StatCard';
@@ -22,19 +23,37 @@ import { FilterBar } from '@/components/crm/FilterBar';
 import { useToast } from '@/components/ui/Toast';
 import { advisorRollup } from '@/lib/metrics';
 import { formatCompactCurrency, formatCurrency, matchesQuery } from '@/lib/utils';
-import { useMockLoading } from '@/hooks/useMockLoading';
 import { useData } from '@/store/DataContext';
 import type { Advisor } from '@/types';
+
+const EMPTY_ADVISOR_FORM = {
+  name: '',
+  email: '',
+  mobile: '',
+  code: '',
+  password: '',
+  agency: '',
+  pan: '',
+  gstin: '',
+  addressLine: '',
+  city: '',
+  state: '',
+  pincode: '',
+};
+
+const STRONG_PASSWORD = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{12,128}$/;
 
 export function AdminAdvisors() {
   const navigate = useNavigate();
   const toast = useToast();
-  const { advisors, applications, payouts, setAdvisorStatus } = useData();
-  const loading = useMockLoading();
+  const { advisors, applications, payouts, createAdvisor, setAdvisorStatus, loading } = useData();
 
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('');
   const [toggling, setToggling] = useState<Advisor | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [form, setForm] = useState(EMPTY_ADVISOR_FORM);
+  const [saving, setSaving] = useState(false);
 
   const rows = useMemo(
     () =>
@@ -60,6 +79,49 @@ export function AdminAdvisors() {
 
   const nextStatus = toggling?.status === 'Active' ? 'Inactive' : 'Active';
 
+  const openCreateForm = () => {
+    setForm({
+      ...EMPTY_ADVISOR_FORM,
+      code: `DSA-${String(advisors.length + 1).padStart(4, '0')}`,
+    });
+    setFormOpen(true);
+  };
+
+  const formValid =
+    form.name.trim().length >= 2 &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()) &&
+    /^\+?[0-9\s()-]{10,20}$/.test(form.mobile.trim()) &&
+    form.code.trim().length >= 2 &&
+    STRONG_PASSWORD.test(form.password) &&
+    (!form.pan || /^[A-Za-z]{5}[0-9]{4}[A-Za-z]$/.test(form.pan)) &&
+    (!form.pincode || /^[1-9][0-9]{5}$/.test(form.pincode));
+
+  const submitAdvisor = async () => {
+    if (!formValid) {
+      toast.error('Check advisor details', 'Complete the required fields and use a strong temporary password.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const advisor = await createAdvisor({
+        ...form,
+        name: form.name.trim(),
+        email: form.email.trim(),
+        mobile: form.mobile.trim(),
+        code: form.code.trim().toUpperCase(),
+        pan: form.pan.trim().toUpperCase(),
+        gstin: form.gstin.trim().toUpperCase(),
+      });
+      setFormOpen(false);
+      setForm(EMPTY_ADVISOR_FORM);
+      toast.success('Advisor added', `${advisor.name} can now sign in with ${advisor.email}.`);
+    } catch (error) {
+      toast.error('Could not add advisor', error instanceof Error ? error.message : 'Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const confirmToggle = () => {
     if (!toggling) return;
     setAdvisorStatus(toggling.id, nextStatus);
@@ -75,6 +137,11 @@ export function AdminAdvisors() {
       <PageHeader
         title="Advisors"
         description="The empanelled DSA network, with the volume and payout each partner has generated."
+        actions={
+          <Button icon={<Plus className="size-4" />} onClick={openCreateForm}>
+            Add advisor
+          </Button>
+        }
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -248,6 +315,101 @@ export function AdminAdvisors() {
           </>
         )}
       </Card>
+
+      <Modal
+        open={formOpen}
+        onClose={() => !saving && setFormOpen(false)}
+        size="lg"
+        title="Add an advisor"
+        description="Create a separate advisor login and DSA profile. Email, mobile and DSA code must be unique."
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setFormOpen(false)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button onClick={() => void submitAdvisor()} loading={saving} disabled={!formValid}>
+              Add advisor
+            </Button>
+          </>
+        }
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Input
+            label="Full name"
+            required
+            value={form.name}
+            onChange={(event) => setForm({ ...form, name: event.target.value })}
+          />
+          <Input
+            label="DSA code"
+            required
+            value={form.code}
+            onChange={(event) => setForm({ ...form, code: event.target.value.toUpperCase() })}
+          />
+          <Input
+            label="Email"
+            type="email"
+            required
+            placeholder="advisor@example.com"
+            value={form.email}
+            onChange={(event) => setForm({ ...form, email: event.target.value })}
+          />
+          <Input
+            label="Mobile"
+            required
+            placeholder="+91 90000 00000"
+            value={form.mobile}
+            onChange={(event) => setForm({ ...form, mobile: event.target.value })}
+          />
+          <Input
+            label="Temporary password"
+            type="password"
+            required
+            hint="12+ characters with uppercase, lowercase, number and symbol."
+            value={form.password}
+            onChange={(event) => setForm({ ...form, password: event.target.value })}
+            containerClassName="sm:col-span-2"
+          />
+          <Input
+            label="Agency / firm"
+            value={form.agency}
+            onChange={(event) => setForm({ ...form, agency: event.target.value })}
+          />
+          <Input
+            label="PAN"
+            placeholder="ABCDE1234F"
+            value={form.pan}
+            onChange={(event) => setForm({ ...form, pan: event.target.value.toUpperCase() })}
+          />
+          <Input
+            label="GSTIN"
+            value={form.gstin}
+            onChange={(event) => setForm({ ...form, gstin: event.target.value.toUpperCase() })}
+          />
+          <Input
+            label="City"
+            value={form.city}
+            onChange={(event) => setForm({ ...form, city: event.target.value })}
+          />
+          <Input
+            label="State"
+            value={form.state}
+            onChange={(event) => setForm({ ...form, state: event.target.value })}
+          />
+          <Input
+            label="Pincode"
+            inputMode="numeric"
+            value={form.pincode}
+            onChange={(event) => setForm({ ...form, pincode: event.target.value.replace(/\D/g, '').slice(0, 6) })}
+          />
+          <Input
+            label="Address"
+            value={form.addressLine}
+            onChange={(event) => setForm({ ...form, addressLine: event.target.value })}
+            containerClassName="sm:col-span-2"
+          />
+        </div>
+      </Modal>
 
       <ConfirmDialog
         open={Boolean(toggling)}

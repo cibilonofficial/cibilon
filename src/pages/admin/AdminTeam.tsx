@@ -24,7 +24,6 @@ import {
 import { useToast } from '@/components/ui/Toast';
 import { ROLE_PERMISSIONS, STAFF_ROLES } from '@/lib/constants';
 import { formatDate, matchesQuery, nowIso, uid } from '@/lib/utils';
-import { useMockLoading } from '@/hooks/useMockLoading';
 import { useData } from '@/store/DataContext';
 import type { Application, StaffMember, StaffRole } from '@/types';
 
@@ -39,17 +38,18 @@ const AVATAR_COLORS = [
 
 const EMPTY_FORM = {
   name: '',
+  code: '',
   email: '',
   mobile: '',
   role: '' as StaffRole | '',
   department: '',
+  password: '',
 };
 
 export function AdminTeam() {
   const navigate = useNavigate();
   const toast = useToast();
-  const { staff, applications, saveStaffMember, setStaffStatus } = useData();
-  const loading = useMockLoading();
+  const { staff, applications, saveStaffMember, setStaffStatus, loading } = useData();
 
   const [query, setQuery] = useState('');
   const [role, setRole] = useState('');
@@ -57,6 +57,8 @@ export function AdminTeam() {
   const [selected, setSelected] = useState<StaffMember | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [savingStaff, setSavingStaff] = useState(false);
   const [toggling, setToggling] = useState<StaffMember | null>(null);
   const [assigning, setAssigning] = useState<Application | null>(null);
 
@@ -96,24 +98,40 @@ export function AdminTeam() {
     unassigned: unassigned.length,
   };
 
-  const submitForm = () => {
-    if (!form.name.trim() || !form.role) return;
+  const submitForm = async () => {
+    const errors: Record<string, string> = {};
+    if (form.name.trim().length < 2) errors.name = 'Enter the staff member’s full name.';
+    if (!form.code.trim()) errors.code = 'Enter a unique employee code.';
+    if (!form.role) errors.role = 'Select a staff role.';
+    if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) errors.email = 'Enter a valid email address.';
+    if (!/^\+?[0-9\s()-]{10,20}$/.test(form.mobile.trim())) errors.mobile = 'Enter a valid mobile number.';
+    if (form.password.length < 12 || !/[a-z]/.test(form.password) || !/[A-Z]/.test(form.password) || !/[0-9]/.test(form.password) || !/[^A-Za-z0-9]/.test(form.password)) {
+      errors.password = 'Use 12+ characters with uppercase, lowercase, number and symbol.';
+    }
+    setFormErrors(errors);
+    if (Object.keys(errors).length) return;
     const member: StaffMember = {
       id: uid('EMP').toUpperCase(),
       name: form.name.trim(),
-      code: `${form.role.slice(0, 3).toUpperCase()}-${Math.floor(100 + Math.random() * 899)}`,
-      email: form.email.trim() || `${form.name.trim().toLowerCase().replace(/\s+/g, '.')}@cibilon.in`,
-      mobile: form.mobile.trim() || '+91 90000 00000',
-      role: form.role,
+      code: form.code.trim().toUpperCase(),
+      email: form.email.trim().toLowerCase(),
+      mobile: form.mobile.trim(),
+      role: form.role as StaffRole,
       department: form.department.trim() || 'Operations',
       status: 'Active',
       joinedOn: nowIso(),
       avatarColor: AVATAR_COLORS[staff.length % AVATAR_COLORS.length],
+      initialPassword: form.password,
     };
-    saveStaffMember(member);
-    setForm(EMPTY_FORM);
-    setFormOpen(false);
-    toast.success('Staff member added', `${member.name} can now be assigned applications.`);
+    setSavingStaff(true);
+    try {
+      await saveStaffMember(member);
+      setForm(EMPTY_FORM);
+      setFormOpen(false);
+      toast.success('Staff member added', `${member.name} can now sign in and receive assignments.`);
+    } catch (error) {
+      toast.error('Could not add staff member', error instanceof Error ? error.message : 'Please try again.');
+    } finally { setSavingStaff(false); }
   };
 
   const confirmToggle = () => {
@@ -487,15 +505,15 @@ export function AdminTeam() {
       {/* Add staff */}
       <Modal
         open={formOpen}
-        onClose={() => setFormOpen(false)}
+        onClose={() => { setFormOpen(false); setFormErrors({}); }}
         title="Add a staff member"
         description="They can be assigned applications as soon as they are active."
         footer={
           <>
-            <Button variant="secondary" onClick={() => setFormOpen(false)}>
+            <Button variant="secondary" onClick={() => { setFormOpen(false); setFormErrors({}); }} disabled={savingStaff}>
               Cancel
             </Button>
-            <Button onClick={submitForm} disabled={!form.name.trim() || !form.role}>
+            <Button onClick={() => void submitForm()} loading={savingStaff}>
               Add member
             </Button>
           </>
@@ -506,15 +524,25 @@ export function AdminTeam() {
             label="Full name"
             required
             value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            error={formErrors.name}
+            onChange={(e) => { setForm({ ...form, name: e.target.value }); setFormErrors({ ...formErrors, name: '' }); }}
             containerClassName="sm:col-span-2"
+          />
+          <Input
+            label="Employee code"
+            required
+            placeholder="EMP-005"
+            value={form.code}
+            error={formErrors.code}
+            onChange={(e) => { setForm({ ...form, code: e.target.value }); setFormErrors({ ...formErrors, code: '' }); }}
           />
           <Select
             label="Role"
             required
             options={STAFF_ROLES}
             value={form.role}
-            onChange={(e) => setForm({ ...form, role: e.target.value as StaffRole })}
+            error={formErrors.role}
+            onChange={(e) => { setForm({ ...form, role: e.target.value as StaffRole }); setFormErrors({ ...formErrors, role: '' }); }}
           />
           <Input
             label="Department"
@@ -527,13 +555,25 @@ export function AdminTeam() {
             type="email"
             placeholder="name@cibilon.in"
             value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
+            error={formErrors.email}
+            onChange={(e) => { setForm({ ...form, email: e.target.value }); setFormErrors({ ...formErrors, email: '' }); }}
           />
           <Input
             label="Mobile"
             placeholder="+91 90000 00000"
             value={form.mobile}
-            onChange={(e) => setForm({ ...form, mobile: e.target.value })}
+            error={formErrors.mobile}
+            onChange={(e) => { setForm({ ...form, mobile: e.target.value }); setFormErrors({ ...formErrors, mobile: '' }); }}
+          />
+          <Input
+            label="Temporary password"
+            type="password"
+            required
+            hint="12+ characters with uppercase, lowercase, number and symbol."
+            error={formErrors.password}
+            value={form.password}
+            onChange={(e) => { setForm({ ...form, password: e.target.value }); setFormErrors({ ...formErrors, password: '' }); }}
+            containerClassName="sm:col-span-2"
           />
         </div>
       </Modal>

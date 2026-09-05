@@ -36,6 +36,7 @@ export const DEMO_ACCOUNTS: (AuthUser & { password: string })[] = [
     email: 'advisor@cibilon.in',
     mobile: '+91 98204 41207',
     role: 'advisor',
+    permissions: [],
     code: 'DSA-1042',
     agency: 'Mehta Financial Services',
     avatarColor: 'bg-brand-600',
@@ -47,6 +48,7 @@ export const DEMO_ACCOUNTS: (AuthUser & { password: string })[] = [
     email: 'admin@cibilon.in',
     mobile: '+91 98450 77120',
     role: 'admin',
+    permissions: [],
     code: 'OPS-004',
     agency: 'Cibilon — Operations',
     avatarColor: 'bg-slate-800',
@@ -480,6 +482,7 @@ export const SEED_PAYOUTS: Payout[] = SEEDS.filter((s) =>
     service: seed.service,
     loanAmount: seed.amount,
     payoutAmount: computePayout(seed.service, seed.amount),
+    estimated: false,
     payoutRate: FLAT_PAYOUTS[seed.service] !== undefined ? 0 : PAYOUT_RATES[seed.service],
     disbursementDate: disbursedOn,
     // Alternate the unpaid rows so every payout state is represented in the demo.

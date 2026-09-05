@@ -22,10 +22,9 @@ import {
 import { FilterBar } from '@/components/crm/FilterBar';
 import { PayoutTrend } from '@/components/charts/Charts';
 import { useToast } from '@/components/ui/Toast';
-import { MONTHLY_TREND } from '@/data/mockData';
+import { monthlyTrend } from '@/lib/metrics';
 import { PAYOUT_STATUSES } from '@/lib/constants';
 import { formatCompactCurrency, formatCurrency, formatDate, matchesQuery } from '@/lib/utils';
-import { useMockLoading } from '@/hooks/useMockLoading';
 import { useData } from '@/store/DataContext';
 import type { PayoutStatus } from '@/types';
 
@@ -39,8 +38,7 @@ const TABS = [
 export function AdminPayouts() {
   const navigate = useNavigate();
   const toast = useToast();
-  const { payouts, advisors, updatePayoutStatus } = useData();
-  const loading = useMockLoading();
+  const { payouts, advisors, updatePayoutStatus, loading } = useData();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [tab, setTab] = useState('all');
@@ -76,6 +74,7 @@ export function AdminPayouts() {
     }),
     [payouts],
   );
+  const trend = useMemo(() => monthlyTrend([], payouts), [payouts]);
 
   const filtered = useMemo(
     () =>
@@ -112,7 +111,7 @@ export function AdminPayouts() {
   );
 
   const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
-  const selectable = paged.filter((p) => p.status !== 'Paid');
+  const selectable = paged.filter((p) => !p.estimated && p.status !== 'Paid');
   const selectedAmount = payouts
     .filter((p) => selection.includes(p.id))
     .reduce((sum, p) => sum + p.payoutAmount, 0);
@@ -134,7 +133,7 @@ export function AdminPayouts() {
     <>
       <PageHeader
         title="Payout management"
-        description="Review, process and release advisor payouts against disbursed files."
+        description="Review estimates after approval, then process and release confirmed payouts after disbursal."
         actions={
           <Button
             icon={<BanknoteArrowUp className="size-4" />}
@@ -183,7 +182,7 @@ export function AdminPayouts() {
       <Card className="mt-3">
         <CardHeader title="Payout outflow" subtitle="Rolling six months" />
         <CardBody>
-          <PayoutTrend data={MONTHLY_TREND} />
+          <PayoutTrend data={trend} />
         </CardBody>
       </Card>
 
@@ -251,7 +250,7 @@ export function AdminPayouts() {
           <EmptyState
             icon={<Wallet className="size-5" />}
             title="No payouts in this view"
-            description="Payouts appear here once an application reaches Disbursed."
+            description="Estimated payouts appear after approval and become releasable after disbursal."
           />
         ) : (
           <>
@@ -291,7 +290,7 @@ export function AdminPayouts() {
                           <input
                             type="checkbox"
                             aria-label={`Select payout ${p.id}`}
-                            disabled={p.status === 'Paid'}
+                            disabled={p.estimated || p.status === 'Paid'}
                             checked={selection.includes(p.id)}
                             onChange={() => toggle(p.id)}
                             className="size-4 rounded border-slate-300 accent-brand-700 disabled:opacity-40"
@@ -326,12 +325,19 @@ export function AdminPayouts() {
                         </TD>
                         <TD>{p.customerName}</TD>
                         <TD>{p.service}</TD>
-                        <TD className="whitespace-nowrap">{formatDate(p.disbursementDate)}</TD>
+                        <TD className="whitespace-nowrap">
+                          {p.estimated ? 'Awaiting disbursal' : formatDate(p.disbursementDate)}
+                        </TD>
                         <TD align="right" className="tnum">
                           {p.loanAmount ? formatCurrency(p.loanAmount) : '—'}
                         </TD>
                         <TD align="right" className="tnum font-semibold text-money-700">
                           {formatCurrency(p.payoutAmount)}
+                          {p.estimated && (
+                            <span className="block text-[11px] font-medium text-amber-600">
+                              Estimated
+                            </span>
+                          )}
                         </TD>
                         <TD>
                           <PayoutBadge status={p.status} />
@@ -344,6 +350,7 @@ export function AdminPayouts() {
                         <TD align="right">
                           <select
                             value={p.status}
+                            disabled={p.estimated}
                             onChange={(e) => {
                               updatePayoutStatus(p.id, e.target.value as PayoutStatus);
                               toast.success(
@@ -351,7 +358,7 @@ export function AdminPayouts() {
                                 `${p.applicationId} → ${e.target.value}`,
                               );
                             }}
-                            className="h-8 rounded-md border border-slate-300 bg-white px-2 text-[13px] text-slate-700 focus:border-brand-500 focus:outline-none"
+                            className="h-8 rounded-md border border-slate-300 bg-white px-2 text-[13px] text-slate-700 focus:border-brand-500 focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                           >
                             {PAYOUT_STATUSES.map((s) => (
                               <option key={s} value={s}>
@@ -375,13 +382,19 @@ export function AdminPayouts() {
                   subtitle={`${p.applicationId} · ${advisorMap.get(p.advisorId)?.name ?? ''}`}
                   badge={<PayoutBadge status={p.status} />}
                   rows={[
-                    { label: 'Payout', value: formatCurrency(p.payoutAmount) },
+                    {
+                      label: 'Payout',
+                      value: `${formatCurrency(p.payoutAmount)}${p.estimated ? ' (estimated)' : ''}`,
+                    },
                     { label: 'Service', value: p.service },
-                    { label: 'Disbursed', value: formatDate(p.disbursementDate) },
+                    {
+                      label: 'Disbursed',
+                      value: p.estimated ? 'Awaiting disbursal' : formatDate(p.disbursementDate),
+                    },
                     { label: 'Paid on', value: formatDate(p.paymentDate) },
                   ]}
                   action={
-                    p.status !== 'Paid' && (
+                    !p.estimated && p.status !== 'Paid' && (
                       <Button
                         size="sm"
                         variant="secondary"

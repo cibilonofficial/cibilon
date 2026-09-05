@@ -33,7 +33,7 @@ import { Avatar, PageHeader, ProgressBar, SectionTitle, Tabs } from '@/component
 import { DocStatusBadge, PayoutBadge, StatusBadge } from '@/components/ui/StatusBadge';
 import { ActivityLog, ApplicationTimeline } from '@/components/ui/Timeline';
 import { useToast } from '@/components/ui/Toast';
-import { APPLICATION_STATUSES } from '@/lib/constants';
+import { APPLICATION_STATUS_TRANSITIONS } from '@/lib/constants';
 import {
   formatBytes,
   formatCurrency,
@@ -61,7 +61,10 @@ export function ApplicationDetails() {
   } = useData();
 
   const isAdmin = user?.role === 'admin';
-  const base = isAdmin ? '/admin' : '/app';
+  const isStaff = user?.role === 'staff';
+  const canUpdate = isAdmin || Boolean(user?.permissions.includes('applications:status:update'));
+  const canRequest = isAdmin || Boolean(user?.permissions.includes('documents:request'));
+  const base = isAdmin ? '/admin' : isStaff ? '/staff' : '/app';
 
   const application = applicationById(id);
   const documents = documentsFor(id);
@@ -108,13 +111,13 @@ export function ApplicationDetails() {
   const submitStatusChange = async () => {
     if (!nextStatus) return;
     setSaving(true);
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    updateApplicationStatus(application.id, nextStatus, statusRemarks, user!.name);
-    setSaving(false);
-    setStatusModal(false);
-    setStatusRemarks('');
-    setNextStatus('');
-    toast.success('Status updated', `${application.id} is now ${nextStatus}.`);
+    try {
+      await updateApplicationStatus(application.id, nextStatus, statusRemarks, user!.name);
+      setStatusModal(false); setStatusRemarks(''); setNextStatus('');
+      toast.success('Status updated', `${application.id} is now ${nextStatus}.`);
+    } catch (error) {
+      toast.error('Status not updated', error instanceof Error ? error.message : 'Please try again.');
+    } finally { setSaving(false); }
   };
 
   const handleReupload = (files: FileList | null) => {
@@ -129,6 +132,7 @@ export function ApplicationDetails() {
       fileName: file.name,
       fileType: file.type || 'application/octet-stream',
       size: file.size,
+      file,
     });
     setReuploadTarget(null);
     toast.success('Document re-uploaded', 'It has gone back to the verification desk.');
@@ -164,31 +168,31 @@ export function ApplicationDetails() {
             >
               Back
             </Button>
-            {isAdmin ? (
+            {isAdmin || isStaff ? (
               <>
-                <Button
+                {isAdmin && <Button
                   variant="secondary"
                   icon={<UserCog className="size-4" />}
                   onClick={() => setAssignOpen(true)}
                 >
                   Assign
-                </Button>
-                <Button
+                </Button>}
+                {canRequest && <Button
                   variant="secondary"
                   icon={<FilePlus2 className="size-4" />}
                   onClick={() => setRequestOpen(true)}
                 >
                   Request document
-                </Button>
-                <Button
+                </Button>}
+                {canUpdate && <Button
                   icon={<RefreshCw className="size-4" />}
                   onClick={() => {
-                    setNextStatus(application.status);
+                    setNextStatus('');
                     setStatusModal(true);
                   }}
                 >
                   Update status
-                </Button>
+                </Button>}
               </>
             ) : (
               <Button
@@ -245,7 +249,7 @@ export function ApplicationDetails() {
               {formatCurrency(application.expectedPayout)}
             </span>
           }
-          hint={payout ? `Payout ${payout.status.toLowerCase()}` : 'On disbursal'}
+          hint={payout ? `Payout ${payout.status.toLowerCase()}` : 'Estimate; final amount confirmed on disbursal'}
         />
       </div>
 
@@ -497,11 +501,11 @@ export function ApplicationDetails() {
                     <div className="flex items-start gap-2.5 text-[13px] text-slate-500">
                       <Wallet className="mt-0.5 size-4 shrink-0 text-slate-400" />
                       <p>
-                        A payout of{' '}
+                        Estimated payout on disbursal:{' '}
                         <span className="font-medium text-slate-700">
                           {formatCurrency(application.expectedPayout)}
                         </span>{' '}
-                        is generated once the file is disbursed.
+                        . Final payout depends on the lender and actual disbursed amount.
                       </p>
                     </div>
                   )}
@@ -541,7 +545,7 @@ export function ApplicationDetails() {
                 {verified} of {documents.length} verified
                 {missing.length > 0 && ` · ${missing.length} waiting on the advisor`}
               </p>
-              {isAdmin && (
+              {canRequest && (
                 <Button
                   variant="secondary"
                   size="sm"
@@ -599,7 +603,7 @@ export function ApplicationDetails() {
                       >
                         {isAdmin ? 'Review' : 'Preview'}
                       </Button>
-                      {!isAdmin && (
+                      {!isAdmin && !isStaff && (
                         <Button
                           variant="secondary"
                           size="sm"
@@ -691,7 +695,7 @@ export function ApplicationDetails() {
       <DocumentPreviewModal
         document={previewing}
         onClose={() => setPreviewing(null)}
-        role={isAdmin ? 'admin' : 'advisor'}
+        role={user?.role ?? 'advisor'}
         customerName={application.customer.fullName}
       />
 
@@ -730,7 +734,7 @@ export function ApplicationDetails() {
           <Select
             label="New status"
             required
-            options={APPLICATION_STATUSES}
+            options={APPLICATION_STATUS_TRANSITIONS[application.status] ?? []}
             value={nextStatus}
             onChange={(e) => setNextStatus(e.target.value as ApplicationStatus)}
           />
@@ -741,12 +745,12 @@ export function ApplicationDetails() {
             value={statusRemarks}
             onChange={(e) => setStatusRemarks(e.target.value)}
           />
-          {(nextStatus === 'Disbursed' || nextStatus === 'Completed') && (
+          {['Approved', 'Disbursed', 'Completed'].includes(nextStatus) && (
             <div className="flex items-start gap-2.5 rounded-lg border border-money-500/20 bg-money-50 px-3 py-2.5">
               <Wallet className="mt-0.5 size-4 shrink-0 text-money-700" />
               <p className="text-[13px] leading-snug text-money-700">
-                A payout of {formatCurrency(application.expectedPayout)} will be raised for{' '}
-                {application.advisorName}.
+                Estimated payout on disbursal: {formatCurrency(application.expectedPayout)} for{' '}
+                {application.advisorName}. Approval does not release a payout. The final amount depends on the lender and actual disbursal.
               </p>
             </div>
           )}

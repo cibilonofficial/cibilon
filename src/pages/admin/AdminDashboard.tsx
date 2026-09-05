@@ -30,16 +30,13 @@ import {
   TableWrap,
 } from '@/components/ui/Table';
 import { ServiceBars, StatusDonut, VolumeBars } from '@/components/charts/Charts';
-import { MONTHLY_TREND } from '@/data/mockData';
-import { advisorRollup, computeMetrics, serviceDistribution, statusDistribution } from '@/lib/metrics';
+import { advisorRollup, computeMetrics, monthlyTrend, serviceDistribution, statusDistribution } from '@/lib/metrics';
 import { formatCompactCurrency, formatCurrency, relativeTime } from '@/lib/utils';
-import { useMockLoading } from '@/hooks/useMockLoading';
 import { useData } from '@/store/DataContext';
 
 export function AdminDashboard() {
   const navigate = useNavigate();
-  const { applications, documents, payouts, advisors } = useData();
-  const loading = useMockLoading();
+  const { applications, documents, payouts, advisors, loading } = useData();
 
   const metrics = useMemo(
     () => computeMetrics(applications, documents, payouts),
@@ -47,6 +44,7 @@ export function AdminDashboard() {
   );
   const distribution = useMemo(() => statusDistribution(applications), [applications]);
   const byService = useMemo(() => serviceDistribution(applications), [applications]);
+  const trend = useMemo(() => monthlyTrend(applications, payouts), [applications, payouts]);
 
   const processing = applications.filter((a) =>
     ['Under Review', 'Processing', 'Submitted to Lender'].includes(a.status),
@@ -170,7 +168,7 @@ export function AdminDashboard() {
         <Card className="xl:col-span-2">
           <CardHeader title="Portfolio volume" subtitle="Submissions vs disbursals, last six months" />
           <CardBody>
-            <VolumeBars data={MONTHLY_TREND} />
+            <VolumeBars data={trend} />
           </CardBody>
         </Card>
         <Card>

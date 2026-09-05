@@ -21,10 +21,9 @@ import {
 import { FilterBar } from '@/components/crm/FilterBar';
 import { PayoutTrend } from '@/components/charts/Charts';
 import { useToast } from '@/components/ui/Toast';
-import { MONTHLY_TREND } from '@/data/mockData';
+import { monthlyTrend } from '@/lib/metrics';
 import { PAYOUT_STATUSES } from '@/lib/constants';
 import { formatCompactCurrency, formatCurrency, formatDate, matchesQuery } from '@/lib/utils';
-import { useMockLoading } from '@/hooks/useMockLoading';
 import { useAuth } from '@/store/AuthContext';
 import { useData } from '@/store/DataContext';
 
@@ -32,8 +31,7 @@ export function Payouts() {
   const navigate = useNavigate();
   const toast = useToast();
   const { user } = useAuth();
-  const { payouts } = useData();
-  const loading = useMockLoading();
+  const { payouts, loading } = useData();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [query, setQuery] = useState('');
@@ -55,6 +53,7 @@ export function Payouts() {
     () => payouts.filter((p) => p.advisorId === user!.id),
     [payouts, user],
   );
+  const trend = useMemo(() => monthlyTrend([], mine), [mine]);
 
   const totals = useMemo(() => {
     const month = new Date().getMonth();
@@ -114,7 +113,7 @@ export function Payouts() {
           value={formatCompactCurrency(totals.total)}
           icon={<Wallet className="size-4" />}
           tone="money"
-          footnote={`${mine.length} payout record(s)`}
+          footnote={`${mine.length} confirmed or estimated record(s)`}
         />
         <StatCard
           label="Pending payout"
@@ -143,7 +142,7 @@ export function Payouts() {
       <Card className="mt-3">
         <CardHeader title="Earnings trend" subtitle="Rolling six-month payout" />
         <CardBody>
-          <PayoutTrend data={MONTHLY_TREND} />
+          <PayoutTrend data={trend} />
         </CardBody>
       </Card>
 
@@ -193,7 +192,7 @@ export function Payouts() {
           <EmptyState
             icon={<Wallet className="size-5" />}
             title="No payouts yet"
-            description="Payouts are generated automatically once an application is disbursed."
+            description="An estimated payout appears after approval and is confirmed when the application is disbursed."
           />
         ) : (
           <>
@@ -204,7 +203,7 @@ export function Payouts() {
                   <TH>Customer</TH>
                   <TH>Service</TH>
                   <TH>Disbursement date</TH>
-                  <TH align="right">Loan amount</TH>
+                  <TH align="right">Basis amount</TH>
                   <TH align="right">Payout</TH>
                   <TH>Payout status</TH>
                   <TH>Payment date</TH>
@@ -215,7 +214,9 @@ export function Payouts() {
                       <TD className="font-medium text-slate-900">{p.applicationId}</TD>
                       <TD>{p.customerName}</TD>
                       <TD>{p.service}</TD>
-                      <TD className="whitespace-nowrap">{formatDate(p.disbursementDate)}</TD>
+                      <TD className="whitespace-nowrap">
+                        {p.estimated ? 'Awaiting disbursal' : formatDate(p.disbursementDate)}
+                      </TD>
                       <TD align="right" className="tnum">
                         {p.loanAmount ? formatCurrency(p.loanAmount) : '—'}
                       </TD>
@@ -223,9 +224,14 @@ export function Payouts() {
                         <span className="tnum font-semibold text-money-700">
                           {formatCurrency(p.payoutAmount)}
                         </span>
+                        {p.estimated && (
+                          <span className="block text-[11px] font-medium text-amber-600">
+                            Estimated
+                          </span>
+                        )}
                         {p.payoutRate > 0 && (
                           <span className="tnum block text-[11px] text-slate-400">
-                            {p.payoutRate.toFixed(2)}% of disbursal
+                            {p.payoutRate.toFixed(2)}% of {p.estimated ? 'requested amount' : 'disbursal'}
                           </span>
                         )}
                       </TD>
@@ -256,11 +262,15 @@ export function Payouts() {
                   badge={<PayoutBadge status={p.status} />}
                   rows={[
                     { label: 'Payout', value: formatCurrency(p.payoutAmount) },
-                    { label: 'Disbursed', value: formatDate(p.disbursementDate) },
                     {
-                      label: 'Loan amount',
+                      label: 'Disbursed',
+                      value: p.estimated ? 'Awaiting disbursal' : formatDate(p.disbursementDate),
+                    },
+                    {
+                      label: 'Basis amount',
                       value: p.loanAmount ? formatCurrency(p.loanAmount) : '—',
                     },
+                    ...(p.estimated ? [{ label: 'Calculation', value: 'Estimated' }] : []),
                     { label: 'Paid on', value: formatDate(p.paymentDate) },
                   ]}
                 />

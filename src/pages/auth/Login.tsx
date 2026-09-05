@@ -15,7 +15,6 @@ import { Button } from '@/components/ui/Button';
 import { Checkbox, Input } from '@/components/ui/Field';
 import { LogoMark } from '@/components/layout/Logo';
 import { useAuth } from '@/store/AuthContext';
-import { DEMO_ACCOUNTS } from '@/data/mockData';
 
 export function Login() {
   const { user, login } = useAuth();
@@ -30,9 +29,10 @@ export function Login() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{ identifier?: string; password?: string }>({});
 
-  if (user) {
-    return <Navigate to={user.role === 'admin' ? '/admin/dashboard' : '/app/dashboard'} replace />;
-  }
+  const homeFor = (role: 'admin' | 'advisor' | 'staff') =>
+    role === 'admin' ? '/admin/dashboard' : role === 'staff' ? '/staff/applications' : '/app/dashboard';
+
+  if (user) return <Navigate to={homeFor(user.role)} replace />;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -44,34 +44,17 @@ export function Login() {
 
     setSubmitting(true);
     setError(null);
-    const message = await login(identifier, password, remember);
+    const result = await login(identifier, password, remember);
     setSubmitting(false);
 
-    if (message) {
-      setError(message);
+    if (result.error) {
+      setError(result.error);
       return;
     }
     const target = (location.state as { from?: string } | null)?.from;
-    const needle = identifier.trim().toLowerCase().replace(/\s+/g, '');
-    const digits = needle.replace(/\D/g, '');
-    const normalizedNeedle = needle.replace(/ciblon/g, 'cibilon');
-    const account = DEMO_ACCOUNTS.find(
-      (a) =>
-        a.email.toLowerCase() === needle ||
-        a.email.toLowerCase() === normalizedNeedle ||
-        (digits.length >= 10 && a.mobile.replace(/\D/g, '').endsWith(digits)),
-    );
-    navigate(target ?? (account?.role === 'admin' ? '/admin/dashboard' : '/app/dashboard'), {
+    navigate(target ?? homeFor(result.role ?? 'advisor'), {
       replace: true,
     });
-  };
-
-  const useDemo = (email: string) => {
-    const acc = DEMO_ACCOUNTS.find((a) => a.email === email);
-    setIdentifier(email);
-    setPassword(acc?.password ?? 'cibilon@123');
-    setFieldErrors({});
-    setError(null);
   };
 
   return (
@@ -221,33 +204,6 @@ export function Login() {
               {submitting ? 'Signing in…' : 'Login'}
             </Button>
           </form>
-
-          <div className="mt-8 rounded-lg border border-slate-200 bg-slate-50 p-3.5">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-              Demo accounts
-            </p>
-            <div className="mt-2.5 space-y-1.5">
-              {DEMO_ACCOUNTS.map((account) => (
-                <button
-                  key={account.id}
-                  type="button"
-                  onClick={() => useDemo(account.email)}
-                  className="flex w-full items-center justify-between gap-3 rounded-md bg-white px-3 py-2 text-left ring-1 ring-slate-200 transition-colors hover:ring-brand-400"
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate text-[13px] font-medium text-slate-800">
-                      {account.email}
-                    </span>
-                    <span className="block text-[11px] text-slate-500">
-                      {account.role === 'admin' ? 'Super Admin' : 'Financial Advisor'} ·{' '}
-                      {account.password}
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-[11px] font-medium text-brand-700">Use</span>
-                </button>
-              ))}
-            </div>
-          </div>
 
           <p className="mt-8 text-center text-xs leading-relaxed text-slate-400">
             Access is restricted to empanelled Cibilon partners. Contact your relationship manager to

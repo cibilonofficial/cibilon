@@ -20,8 +20,7 @@ import { StatCard } from '@/components/ui/StatCard';
 import { Chip, PayoutBadge, StatusBadge, TicketBadge } from '@/components/ui/StatusBadge';
 import { TBody, TD, TH, THead, TR, TableWrap } from '@/components/ui/Table';
 import { useToast } from '@/components/ui/Toast';
-import { MONTHLY_TREND } from '@/data/mockData';
-import { ACTIVE_STATUSES, COMPLETED_STATUSES, serviceDistribution } from '@/lib/metrics';
+import { ACTIVE_STATUSES, COMPLETED_STATUSES, monthlyTrend, serviceDistribution } from '@/lib/metrics';
 import { formatCompactCurrency, formatCurrency, formatDate, relativeTime } from '@/lib/utils';
 import { useData } from '@/store/DataContext';
 
@@ -41,6 +40,7 @@ export function AdminAdvisorDetails() {
     [applications, id],
   );
   const minePayouts = useMemo(() => payouts.filter((p) => p.advisorId === id), [payouts, id]);
+  const trend = useMemo(() => monthlyTrend(mine, minePayouts), [mine, minePayouts]);
   const myTickets = useMemo(() => tickets.filter((t) => t.advisorId === id), [tickets, id]);
 
   if (!advisor) {
@@ -351,7 +351,7 @@ export function AdminAdvisorDetails() {
                 <Card>
                   <CardHeader title="Payout trend" subtitle="Rolling six months (network view)" />
                   <CardBody>
-                    <PayoutTrend data={MONTHLY_TREND} />
+                    <PayoutTrend data={trend} />
                   </CardBody>
                 </Card>
               </CardBody>

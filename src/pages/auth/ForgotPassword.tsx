@@ -4,6 +4,7 @@ import { ArrowLeft, CheckCircle2, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Field';
 import { LogoMark } from '@/components/layout/Logo';
+import { apiRequest, errorMessage } from '@/lib/api';
 
 export function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -19,10 +20,18 @@ export function ForgotPassword() {
     }
     setError(undefined);
     setSending(true);
-    // Stands in for POST /auth/forgot-password.
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    setSending(false);
-    setSent(true);
+    try {
+      await apiRequest('/auth/forgot-password', {
+        method: 'POST',
+        body: { email: email.trim() },
+        skipRefresh: true,
+      });
+      setSent(true);
+    } catch (requestError) {
+      setError(errorMessage(requestError));
+    } finally {
+      setSending(false);
+    }
   };
 
   return (

@@ -1,6 +1,5 @@
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, Eye, FileSearch, FileText, XCircle } from 'lucide-react';
+import { Fragment, useMemo, useState } from 'react';
+import { CheckCircle2, ChevronDown, ChevronRight, Eye, FileSearch, FileText, XCircle } from 'lucide-react';
 import { DocumentPreviewModal } from '@/components/crm/DocumentPreviewModal';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -12,7 +11,6 @@ import { Pagination } from '@/components/ui/Pagination';
 import { StatCard } from '@/components/ui/StatCard';
 import {
   MobileCardList,
-  MobileRow,
   TBody,
   TD,
   TH,
@@ -24,7 +22,6 @@ import { FilterBar } from '@/components/crm/FilterBar';
 import { useToast } from '@/components/ui/Toast';
 import { DOCUMENT_STATUSES } from '@/lib/constants';
 import { formatBytes, formatDate, matchesQuery } from '@/lib/utils';
-import { useMockLoading } from '@/hooks/useMockLoading';
 import { useData } from '@/store/DataContext';
 import type { AppDocument } from '@/types';
 
@@ -36,10 +33,8 @@ const TABS = [
 ];
 
 export function AdminDocuments() {
-  const navigate = useNavigate();
   const toast = useToast();
-  const { documents, applications, setDocumentStatus } = useData();
-  const loading = useMockLoading();
+  const { documents, applications, setDocumentStatus, loading } = useData();
 
   const [tab, setTab] = useState('queue');
   const [query, setQuery] = useState('');
@@ -47,6 +42,7 @@ export function AdminDocuments() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [previewing, setPreviewing] = useState<AppDocument | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const appMap = useMemo(() => new Map(applications.map((a) => [a.id, a])), [applications]);
 
@@ -86,11 +82,26 @@ export function AdminDocuments() {
     [documents, tab, query, status, appMap],
   );
 
-  const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const grouped = useMemo(() => {
+    const groups = new Map<string, AppDocument[]>();
+    filtered.forEach((doc) => groups.set(doc.applicationId, [...(groups.get(doc.applicationId) ?? []), doc]));
+    return [...groups.entries()].map(([applicationId, items]) => ({
+      applicationId,
+      application: appMap.get(applicationId),
+      documents: items,
+      latestUpload: Math.max(...items.map((doc) => +new Date(doc.uploadedAt ?? 0))),
+    })).sort((a, b) => b.latestUpload - a.latestUpload);
+  }, [filtered, appMap]);
 
-  const verify = (doc: AppDocument) => {
-    setDocumentStatus(doc.id, 'Verified', '');
-    toast.success('Document verified', `${doc.name} on ${doc.applicationId}`);
+  const paged = grouped.slice((page - 1) * pageSize, page * pageSize);
+
+  const verify = async (doc: AppDocument) => {
+    try {
+      await setDocumentStatus(doc.id, 'Verified', '');
+      toast.success('Document verified', `${doc.name} for ${appMap.get(doc.applicationId)?.customer.fullName ?? doc.applicationId}`);
+    } catch (error) {
+      toast.error('Verification failed', error instanceof Error ? error.message : 'Please try again.');
+    }
   };
 
   return (
@@ -171,7 +182,7 @@ export function AdminDocuments() {
 
         {loading ? (
           <TableSkeleton rows={8} cols={7} />
-        ) : filtered.length === 0 ? (
+        ) : grouped.length === 0 ? (
           <EmptyState
             icon={<FileSearch className="size-5" />}
             title="Queue is clear"
@@ -182,81 +193,49 @@ export function AdminDocuments() {
             <div className="hidden lg:block">
               <TableWrap className="min-w-full">
                 <THead>
-                  <TH>Application</TH>
-                  <TH>Customer</TH>
+                  <TH>Lead / Application</TH>
                   <TH>Advisor</TH>
-                  <TH>Document</TH>
-                  <TH>Uploaded</TH>
-                  <TH>Status</TH>
-                  <TH align="right">Verification</TH>
+                  <TH>Service</TH>
+                  <TH align="right">Documents</TH>
+                  <TH>Progress</TH>
+                  <TH align="right">Open</TH>
                 </THead>
                 <TBody>
-                  {paged.map((doc) => {
-                    const app = appMap.get(doc.applicationId);
+                  {paged.map((group) => {
+                    const app = group.application;
+                    const open = expandedId === group.applicationId;
+                    const verifiedCount = group.documents.filter((doc) => doc.status === 'Verified').length;
                     return (
-                      <TR key={doc.id}>
-                        <TD>
-                          <button
-                            type="button"
-                            onClick={() => navigate(`/admin/applications/${doc.applicationId}`)}
-                            className="font-medium text-brand-700 hover:underline"
-                          >
-                            {doc.applicationId}
-                          </button>
-                        </TD>
-                        <TD>{app?.customer.fullName ?? '—'}</TD>
-                        <TD className="text-slate-600">{app?.advisorName ?? '—'}</TD>
-                        <TD>
-                          <span className="flex items-center gap-2">
-                            <FileTypeIcon fileType={doc.fileType} />
-                            <span className="min-w-0">
-                              <span className="block font-medium text-slate-800">{doc.name}</span>
-                              <span className="block truncate text-xs text-slate-500">
-                                {doc.fileName
-                                  ? `${doc.fileName} · ${formatBytes(doc.size)}`
-                                  : 'Not uploaded'}
+                      <Fragment key={group.applicationId}>
+                        <TR onClick={() => setExpandedId(open ? null : group.applicationId)}>
+                          <TD>
+                            <span className="flex items-center gap-2.5">
+                              {open ? <ChevronDown className="size-4 text-brand-600" /> : <ChevronRight className="size-4 text-slate-400" />}
+                              <span>
+                                <span className="block font-semibold text-slate-900">{app?.customer.fullName ?? 'Unknown lead'}</span>
+                                <span className="block text-xs text-brand-700">{group.applicationId}</span>
                               </span>
                             </span>
-                          </span>
-                        </TD>
-                        <TD className="whitespace-nowrap">{formatDate(doc.uploadedAt)}</TD>
-                        <TD>
-                          <DocStatusBadge status={doc.status} />
-                          {doc.remarks && (
-                            <span className="mt-0.5 line-clamp-1 block text-xs text-slate-400">
-                              {doc.remarks}
-                            </span>
-                          )}
-                        </TD>
-                        <TD align="right">
-                          <div className="flex justify-end gap-1.5">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              icon={<Eye className="size-3.5" />}
-                              onClick={() => setPreviewing(doc)}
-                            >
-                              Preview
-                            </Button>
-                            <Button
-                              variant="success"
-                              size="sm"
-                              disabled={!doc.fileName || doc.status === 'Verified'}
-                              onClick={() => verify(doc)}
-                            >
-                              Verify
-                            </Button>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              disabled={!doc.fileName}
-                              onClick={() => setPreviewing(doc)}
-                            >
-                              Bounce
-                            </Button>
-                          </div>
-                        </TD>
-                      </TR>
+                          </TD>
+                          <TD>{app?.advisorName ?? '—'}</TD>
+                          <TD>{app?.service ?? '—'}</TD>
+                          <TD align="right" className="tnum font-medium">{group.documents.length}</TD>
+                          <TD><span className="text-sm text-slate-600">{verifiedCount} verified · {group.documents.length - verifiedCount} pending</span></TD>
+                          <TD align="right"><Button variant="secondary" size="sm" onClick={(event) => { event.stopPropagation(); setExpandedId(open ? null : group.applicationId); }}>{open ? 'Close' : 'View documents'}</Button></TD>
+                        </TR>
+                        {open && <TR className="bg-slate-50/70">
+                          <TD colSpan={6} className="p-0">
+                            <div className="divide-y divide-slate-200 border-y border-slate-200">
+                              {group.documents.map((doc) => <div key={doc.id} className="grid grid-cols-[minmax(220px,1fr)_150px_130px_auto] items-center gap-4 px-8 py-3">
+                                <span className="flex min-w-0 items-center gap-2"><FileTypeIcon fileType={doc.fileType} /><span className="min-w-0"><span className="block font-medium text-slate-800">{doc.name}</span><span className="block truncate text-xs text-slate-500">{doc.fileName ? `${doc.fileName} · ${formatBytes(doc.size)}` : 'Not uploaded'}</span></span></span>
+                                <span className="text-xs text-slate-500">{formatDate(doc.uploadedAt)}</span>
+                                <DocStatusBadge status={doc.status} />
+                                <span className="flex justify-end gap-1.5"><Button variant="ghost" size="sm" icon={<Eye className="size-3.5" />} onClick={() => setPreviewing(doc)}>Preview</Button><Button variant="success" size="sm" disabled={!doc.fileName || doc.status === 'Verified'} onClick={() => void verify(doc)}>Verify</Button><Button variant="secondary" size="sm" disabled={!doc.fileName} onClick={() => setPreviewing(doc)}>Bounce</Button></span>
+                              </div>)}
+                            </div>
+                          </TD>
+                        </TR>}
+                      </Fragment>
                     );
                   })}
                 </TBody>
@@ -264,39 +243,22 @@ export function AdminDocuments() {
             </div>
 
             <MobileCardList className="lg:hidden">
-              {paged.map((doc) => (
-                <MobileRow
-                  key={doc.id}
-                  title={doc.name}
-                  subtitle={`${doc.applicationId} · ${appMap.get(doc.applicationId)?.customer.fullName ?? ''}`}
-                  badge={<DocStatusBadge status={doc.status} />}
-                  rows={[
-                    { label: 'Advisor', value: appMap.get(doc.applicationId)?.advisorName ?? '—' },
-                    { label: 'Uploaded', value: formatDate(doc.uploadedAt) },
-                  ]}
-                  action={
-                    <>
-                      <Button variant="secondary" size="sm" onClick={() => setPreviewing(doc)}>
-                        Preview
-                      </Button>
-                      <Button
-                        variant="success"
-                        size="sm"
-                        disabled={!doc.fileName || doc.status === 'Verified'}
-                        onClick={() => verify(doc)}
-                      >
-                        Verify
-                      </Button>
-                    </>
-                  }
-                />
-              ))}
+              {paged.map((group) => {
+                const open = expandedId === group.applicationId;
+                return <div key={group.applicationId} className="px-4 py-4">
+                  <button type="button" className="flex w-full items-start justify-between gap-3 text-left" onClick={() => setExpandedId(open ? null : group.applicationId)}>
+                    <span><span className="block font-semibold text-slate-900">{group.application?.customer.fullName ?? 'Unknown lead'}</span><span className="mt-0.5 block text-xs text-brand-700">{group.applicationId}</span><span className="mt-1 block text-xs text-slate-500">{group.documents.length} documents · {group.application?.advisorName ?? '—'}</span></span>
+                    {open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                  </button>
+                  {open && <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">{group.documents.map((doc) => <button type="button" key={doc.id} onClick={() => setPreviewing(doc)} className="flex w-full items-center justify-between gap-2 rounded-lg bg-slate-50 p-3 text-left"><span className="min-w-0"><span className="block truncate text-sm font-medium">{doc.name}</span><span className="block truncate text-xs text-slate-500">{doc.fileName || 'Not uploaded'}</span></span><DocStatusBadge status={doc.status} /></button>)}</div>}
+                </div>;
+              })}
             </MobileCardList>
 
             <Pagination
               page={page}
               pageSize={pageSize}
-              total={filtered.length}
+              total={grouped.length}
               onPageChange={setPage}
               onPageSizeChange={(size) => {
                 setPageSize(size);

@@ -46,14 +46,14 @@ export function Sidebar({
         <button
           type="button"
           onClick={() => {
-            navigate(role === 'admin' ? '/admin/dashboard' : '/app/dashboard');
+            navigate(role === 'admin' ? '/admin/dashboard' : role === 'staff' ? '/staff/applications' : '/app/dashboard');
             onNavigate?.();
           }}
           className="min-w-0 rounded-lg text-left"
         >
           <Wordmark
             compact={isCollapsed}
-            subtitle={role === 'admin' ? 'Operations Console' : 'Advisor CRM'}
+            subtitle={role === 'admin' ? 'Operations Console' : role === 'staff' ? 'Staff Workspace' : 'Advisor CRM'}
           />
         </button>
         {mobile && (

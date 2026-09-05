@@ -102,6 +102,21 @@ export const ADMIN_NAV: NavGroup[] = [
   },
 ];
 
+export const STAFF_NAV: NavGroup[] = [
+  {
+    label: null,
+    items: [{ label: 'Assigned applications', to: '/staff/applications', icon: FileStack }],
+  },
+  {
+    label: 'Account',
+    items: [
+      { label: 'Notifications', to: '/staff/notifications', icon: Bell, badge: 'notifications' },
+    ],
+  },
+];
+
 export function navFor(role: Role): NavGroup[] {
-  return role === 'admin' ? ADMIN_NAV : ADVISOR_NAV;
+  if (role === 'admin') return ADMIN_NAV;
+  if (role === 'staff') return STAFF_NAV;
+  return ADVISOR_NAV;
 }

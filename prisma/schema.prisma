@@ -1,0 +1,907 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../server/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum LeadStatus {
+  DRAFT
+  ACTIVE
+  CONVERTED
+  ARCHIVED
+}
+
+enum LeadStage {
+  NEW
+  CONTACTED
+  QUALIFIED
+  DOCUMENTS_PENDING
+  CONVERTED
+  DROPPED
+}
+
+enum LeadActivityKind {
+  CALL
+  MEETING
+  EMAIL
+  NOTE
+  STAGE_CHANGE
+  FOLLOW_UP
+  CONVERSION
+}
+
+enum ApplicationStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  DOCUMENTS_PENDING
+  SENT_TO_LENDER
+  LENDER_PROCESSING
+  APPROVED
+  REJECTED
+  DISBURSED
+  CANCELLED
+}
+
+enum ApplicationActivityKind {
+  SUBMISSION
+  STATUS_CHANGE
+  ASSIGNMENT
+  REMARK
+  CALL
+  EMAIL
+  MEETING
+  NOTE
+  DOCUMENT
+}
+
+enum NotificationType {
+  APPLICATION_CREATED
+  APPLICATION_ASSIGNED
+  LEAD_ASSIGNED
+  FOLLOW_UP_DUE
+  STATUS_CHANGED
+  DOCUMENT_ACTION
+  PAYOUT_ACTION
+  SUPPORT_ACTION
+  REPORT_ACTION
+  SECURITY
+}
+
+enum DocumentRequestStatus {
+  PENDING
+  UPLOADED
+  VERIFIED
+  REJECTED
+}
+
+enum MalwareScanStatus {
+  PENDING
+  CLEAN
+  INFECTED
+  FAILED
+}
+
+enum AdvisorBankStatus {
+  PENDING_VERIFICATION
+  VERIFIED
+  REJECTED
+}
+
+enum StaffRole {
+  OPERATIONS_MANAGER
+  CREDIT_ANALYST
+  VERIFICATION_OFFICER
+  PAYOUT_EXECUTIVE
+  RELATIONSHIP_MANAGER
+}
+
+enum LenderType {
+  BANK
+  NBFC
+  HFC
+  FINTECH
+  INSURER
+}
+
+enum LenderStatus {
+  ACTIVE
+  PAUSED
+  INACTIVE
+}
+
+enum CommissionCalculationType {
+  PERCENTAGE
+  FLAT
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+  CANCELLED
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum TicketCategory {
+  APPLICATION_QUERY
+  DOCUMENT_ISSUE
+  PAYOUT_QUERY
+  ACCOUNT_ACCESS
+  PRODUCT_INFORMATION
+  OTHER
+}
+
+enum ExportJobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum ExportFormat {
+  CSV
+  PDF
+}
+
+enum ReportType {
+  APPLICATIONS
+  ADVISORS
+  PAYOUTS
+  LENDERS
+}
+
+model User {
+  id                          String                     @id @default(uuid()) @db.Uuid
+  email                       String                     @unique @db.VarChar(320)
+  mobile                      String?                    @unique @db.VarChar(20)
+  name                        String                     @db.VarChar(160)
+  passwordHash                String                     @map("password_hash") @db.VarChar(255)
+  status                      UserStatus                 @default(ACTIVE)
+  lastLoginAt                 DateTime?                  @map("last_login_at") @db.Timestamptz(3)
+  createdAt                   DateTime                   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                   DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(3)
+  sessions                    Session[]
+  passwordResetTokens         PasswordResetToken[]
+  userRoles                   UserRole[]
+  directPermissions           UserPermission[]
+  advisorProfile              Advisor?
+  staffProfile                Staff?
+  auditLogs                   AuditLog[]                 @relation("AuditActor")
+  customersCreated            Customer[]                 @relation("CustomerCreator")
+  leadsCreated                Lead[]                     @relation("LeadCreator")
+  activitiesCreated           LeadActivity[]             @relation("LeadActivityCreator")
+  applicationsCreated         Application[]              @relation("ApplicationCreator")
+  statusChanges               ApplicationStatusHistory[] @relation("ApplicationStatusActor")
+  notifications               Notification[]             @relation("NotificationRecipient")
+  documentRequestsCreated     DocumentRequest[]          @relation("DocumentRequestCreator")
+  documentRequestsReviewed    DocumentRequest[]          @relation("DocumentRequestReviewer")
+  documentVersionsUploaded    DocumentVersion[]          @relation("DocumentVersionUploader")
+  advisorBankAccountsReviewed AdvisorBankAccount[]       @relation("AdvisorBankReviewer")
+  commissionRulesCreated      CommissionRule[]           @relation("CommissionRuleCreator")
+  payoutStatusChanges         PayoutStatusHistory[]      @relation("PayoutStatusActor")
+  supportTicketsCreated       SupportTicket[]            @relation("SupportTicketCreator")
+  ticketMessages              TicketMessage[]            @relation("TicketMessageAuthor")
+  exportJobs                  ExportJob[]                @relation("ExportJobRequester")
+  applicationAssignments      ApplicationAssignment[]    @relation("ApplicationAssignmentActor")
+  applicationRemarks          ApplicationRemark[]        @relation("ApplicationRemarkAuthor")
+  applicationActivities       ApplicationActivity[]      @relation("ApplicationActivityCreator")
+
+  @@map("users")
+}
+
+model Session {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash") @db.Char(64)
+  ipAddress  String?   @map("ip_address") @db.VarChar(64)
+  userAgent  String?   @map("user_agent") @db.VarChar(512)
+  persistent Boolean   @default(false)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(3)
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(3)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash") @db.Char(64)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, usedAt])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+model Role {
+  id          String           @id @default(uuid()) @db.Uuid
+  slug        String           @unique @db.VarChar(64)
+  name        String           @db.VarChar(100)
+  description String?          @db.VarChar(255)
+  isSystem    Boolean          @default(false) @map("is_system")
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  userRoles   UserRole[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String           @id @default(uuid()) @db.Uuid
+  code        String           @unique @db.VarChar(100)
+  description String?          @db.VarChar(255)
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  roles       RolePermission[]
+  users       UserPermission[]
+
+  @@map("permissions")
+}
+
+model UserPermission {
+  userId       String     @map("user_id") @db.Uuid
+  permissionId String     @map("permission_id") @db.Uuid
+  assignedAt   DateTime   @default(now()) @map("assigned_at") @db.Timestamptz(3)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([userId, permissionId])
+  @@index([permissionId])
+  @@map("user_permissions")
+}
+
+model UserRole {
+  userId     String   @map("user_id") @db.Uuid
+  roleId     String   @map("role_id") @db.Uuid
+  assignedAt DateTime @default(now()) @map("assigned_at") @db.Timestamptz(3)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  roleId       String     @map("role_id") @db.Uuid
+  permissionId String     @map("permission_id") @db.Uuid
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
+
+model Advisor {
+  id             String              @id @default(uuid()) @db.Uuid
+  userId         String              @unique @map("user_id") @db.Uuid
+  code           String              @unique @db.VarChar(40)
+  agency         String?             @db.VarChar(160)
+  gstin          String?             @db.VarChar(15)
+  panEncrypted   String?             @map("pan_encrypted") @db.Text
+  panLastFour    String?             @map("pan_last_four") @db.Char(4)
+  addressLine    String?             @map("address_line") @db.VarChar(500)
+  city           String?             @db.VarChar(100)
+  state          String?             @db.VarChar(100)
+  pincode        String?             @db.Char(6)
+  photoUrl       String?             @map("photo_url") @db.VarChar(1000)
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customers      Customer[]
+  leads          Lead[]
+  applications   Application[]
+  bankAccount    AdvisorBankAccount?
+  payouts        Payout[]
+  supportTickets SupportTicket[]
+
+  @@map("advisors")
+}
+
+model Staff {
+  id                   String                  @id @default(uuid()) @db.Uuid
+  userId               String                  @unique @map("user_id") @db.Uuid
+  code                 String                  @unique @db.VarChar(40)
+  department           String?                 @db.VarChar(100)
+  role                 StaffRole               @default(CREDIT_ANALYST)
+  createdAt            DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user                 User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedApplications Application[]           @relation("CurrentApplicationAssignee")
+  assignmentHistory    ApplicationAssignment[]
+  assignedTickets      SupportTicket[]
+
+  @@map("staff")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  action      String   @db.VarChar(100)
+  entityType  String   @map("entity_type") @db.VarChar(100)
+  entityId    String?  @map("entity_id") @db.VarChar(100)
+  requestId   String?  @map("request_id") @db.VarChar(100)
+  ipAddress   String?  @map("ip_address") @db.VarChar(64)
+  userAgent   String?  @map("user_agent") @db.VarChar(512)
+  metadata    Json?
+  occurredAt  DateTime @default(now()) @map("occurred_at") @db.Timestamptz(3)
+  actor       User?    @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId, occurredAt])
+  @@index([entityType, entityId])
+  @@index([action, occurredAt])
+  @@map("audit_logs")
+}
+
+model Customer {
+  id               String        @id @default(uuid()) @db.Uuid
+  advisorId        String        @map("advisor_id") @db.Uuid
+  createdByUserId  String        @map("created_by_user_id") @db.Uuid
+  fullName         String?       @map("full_name") @db.VarChar(160)
+  mobile           String?       @db.VarChar(20)
+  email            String?       @db.VarChar(320)
+  dateOfBirth      DateTime?     @map("date_of_birth") @db.Date
+  gender           Gender?
+  panEncrypted     String?       @map("pan_encrypted") @db.Text
+  panLastFour      String?       @map("pan_last_four") @db.Char(4)
+  aadhaarEncrypted String?       @map("aadhaar_encrypted") @db.Text
+  aadhaarLastFour  String?       @map("aadhaar_last_four") @db.Char(4)
+  addressLine      String?       @map("address_line") @db.VarChar(500)
+  city             String?       @db.VarChar(100)
+  state            String?       @db.VarChar(100)
+  pincode          String?       @db.Char(6)
+  archivedAt       DateTime?     @map("archived_at") @db.Timestamptz(3)
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  advisor          Advisor       @relation(fields: [advisorId], references: [id], onDelete: Restrict)
+  createdBy        User          @relation("CustomerCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  leads            Lead[]
+  applications     Application[]
+
+  @@unique([advisorId, mobile])
+  @@index([advisorId, createdAt])
+  @@index([fullName])
+  @@map("customers")
+}
+
+model Lead {
+  id                   String         @id @default(uuid()) @db.Uuid
+  advisorId            String         @map("advisor_id") @db.Uuid
+  customerId           String?        @map("customer_id") @db.Uuid
+  createdByUserId      String         @map("created_by_user_id") @db.Uuid
+  status               LeadStatus     @default(DRAFT)
+  stage                LeadStage      @default(NEW)
+  serviceType          String?        @map("service_type") @db.VarChar(80)
+  requestedAmount      Decimal?       @map("requested_amount") @db.Decimal(15, 2)
+  employmentData       Json?          @map("employment_data")
+  bankAccountEncrypted String?        @map("bank_account_encrypted") @db.Text
+  bankAccountLastFour  String?        @map("bank_account_last_four") @db.Char(4)
+  serviceData          Json?          @map("service_data")
+  source               String?        @db.VarChar(100)
+  notes                String?        @db.Text
+  nextFollowUpAt       DateTime?      @map("next_follow_up_at") @db.Timestamptz(3)
+  convertedAt          DateTime?      @map("converted_at") @db.Timestamptz(3)
+  archivedAt           DateTime?      @map("archived_at") @db.Timestamptz(3)
+  createdAt            DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  advisor              Advisor        @relation(fields: [advisorId], references: [id], onDelete: Restrict)
+  customer             Customer?      @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  createdBy            User           @relation("LeadCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  activities           LeadActivity[]
+  application          Application?
+  notifications        Notification[]
+
+  @@index([advisorId, status, createdAt])
+  @@index([customerId])
+  @@index([stage, createdAt])
+  @@index([serviceType, createdAt])
+  @@index([nextFollowUpAt])
+  @@map("leads")
+}
+
+model LeadActivity {
+  id              String           @id @default(uuid()) @db.Uuid
+  leadId          String           @map("lead_id") @db.Uuid
+  createdByUserId String           @map("created_by_user_id") @db.Uuid
+  kind            LeadActivityKind
+  note            String           @db.Text
+  dueAt           DateTime?        @map("due_at") @db.Timestamptz(3)
+  completedAt     DateTime?        @map("completed_at") @db.Timestamptz(3)
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  lead            Lead             @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  createdBy       User             @relation("LeadActivityCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([leadId, createdAt])
+  @@index([kind, dueAt])
+  @@map("lead_activities")
+}
+
+model ApplicationCounter {
+  period    String   @id @db.Char(6)
+  value     Int      @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("application_counters")
+}
+
+model Application {
+  id                 String                     @id @default(uuid()) @db.Uuid
+  applicationNumber  String                     @unique @map("application_number") @db.VarChar(30)
+  leadId             String                     @unique @map("lead_id") @db.Uuid
+  customerId         String                     @map("customer_id") @db.Uuid
+  advisorId          String                     @map("advisor_id") @db.Uuid
+  createdByUserId    String                     @map("created_by_user_id") @db.Uuid
+  assignedStaffId    String?                    @map("assigned_staff_id") @db.Uuid
+  assignedAt         DateTime?                  @map("assigned_at") @db.Timestamptz(3)
+  status             ApplicationStatus          @default(SUBMITTED)
+  serviceType        String                     @map("service_type") @db.VarChar(80)
+  requestedAmount    Decimal?                   @map("requested_amount") @db.Decimal(15, 2)
+  customerSnapshot   Json                       @map("customer_snapshot")
+  employmentSnapshot Json?                      @map("employment_snapshot")
+  serviceSnapshot    Json?                      @map("service_snapshot")
+  lenderId           String?                    @map("lender_id") @db.Uuid
+  disbursedAmount    Decimal?                   @map("disbursed_amount") @db.Decimal(15, 2)
+  disbursedAt        DateTime?                  @map("disbursed_at") @db.Timestamptz(3)
+  submittedAt        DateTime                   @default(now()) @map("submitted_at") @db.Timestamptz(3)
+  createdAt          DateTime                   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(3)
+  lead               Lead                       @relation(fields: [leadId], references: [id], onDelete: Restrict)
+  customer           Customer                   @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  advisor            Advisor                    @relation(fields: [advisorId], references: [id], onDelete: Restrict)
+  createdBy          User                       @relation("ApplicationCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  assignedStaff      Staff?                     @relation("CurrentApplicationAssignee", fields: [assignedStaffId], references: [id], onDelete: SetNull)
+  statusHistory      ApplicationStatusHistory[]
+  assignments        ApplicationAssignment[]
+  remarks            ApplicationRemark[]
+  activities         ApplicationActivity[]
+  notifications      Notification[]
+  documentRequests   DocumentRequest[]
+  documents          Document[]
+  lender             Lender?                    @relation(fields: [lenderId], references: [id], onDelete: Restrict)
+  payout             Payout?
+  supportTickets     SupportTicket[]
+
+  @@index([advisorId, status, createdAt])
+  @@index([customerId])
+  @@index([assignedStaffId, status, updatedAt])
+  @@index([lenderId, status, updatedAt])
+  @@map("applications")
+}
+
+model ApplicationStatusHistory {
+  id              String             @id @default(uuid()) @db.Uuid
+  applicationId   String             @map("application_id") @db.Uuid
+  fromStatus      ApplicationStatus? @map("from_status")
+  toStatus        ApplicationStatus  @map("to_status")
+  remarks         String?            @db.Text
+  changedByUserId String             @map("changed_by_user_id") @db.Uuid
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  application     Application        @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  changedBy       User               @relation("ApplicationStatusActor", fields: [changedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([applicationId, createdAt])
+  @@map("application_status_history")
+}
+
+model ApplicationAssignment {
+  id               String      @id @default(uuid()) @db.Uuid
+  applicationId    String      @map("application_id") @db.Uuid
+  staffId          String      @map("staff_id") @db.Uuid
+  assignedByUserId String      @map("assigned_by_user_id") @db.Uuid
+  note             String?     @db.Text
+  assignedAt       DateTime    @default(now()) @map("assigned_at") @db.Timestamptz(3)
+  unassignedAt     DateTime?   @map("unassigned_at") @db.Timestamptz(3)
+  application      Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  staff            Staff       @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  assignedBy       User        @relation("ApplicationAssignmentActor", fields: [assignedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([applicationId, assignedAt])
+  @@index([staffId, unassignedAt])
+  @@map("application_assignments")
+}
+
+model ApplicationRemark {
+  id            String      @id @default(uuid()) @db.Uuid
+  applicationId String      @map("application_id") @db.Uuid
+  authorUserId  String      @map("author_user_id") @db.Uuid
+  body          String      @db.Text
+  internal      Boolean     @default(true)
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  author        User        @relation("ApplicationRemarkAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+
+  @@index([applicationId, createdAt])
+  @@map("application_remarks")
+}
+
+model ApplicationActivity {
+  id              String                  @id @default(uuid()) @db.Uuid
+  applicationId   String                  @map("application_id") @db.Uuid
+  createdByUserId String                  @map("created_by_user_id") @db.Uuid
+  kind            ApplicationActivityKind
+  note            String                  @db.Text
+  internal        Boolean                 @default(false)
+  metadata        Json?
+  createdAt       DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  application     Application             @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  createdBy       User                    @relation("ApplicationActivityCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([applicationId, createdAt])
+  @@index([kind, createdAt])
+  @@map("application_activities")
+}
+
+model Notification {
+  id              String           @id @default(uuid()) @db.Uuid
+  recipientUserId String           @map("recipient_user_id") @db.Uuid
+  type            NotificationType
+  title           String           @db.VarChar(200)
+  body            String           @db.Text
+  leadId          String?          @map("lead_id") @db.Uuid
+  applicationId   String?          @map("application_id") @db.Uuid
+  payoutId        String?          @map("payout_id") @db.Uuid
+  ticketId        String?          @map("ticket_id") @db.Uuid
+  isRead          Boolean          @default(false) @map("is_read")
+  readAt          DateTime?        @map("read_at") @db.Timestamptz(3)
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  recipient       User             @relation("NotificationRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
+  lead            Lead?            @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  application     Application?     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  payout          Payout?          @relation(fields: [payoutId], references: [id], onDelete: Cascade)
+  ticket          SupportTicket?   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([recipientUserId, isRead, createdAt])
+  @@index([applicationId])
+  @@index([payoutId])
+  @@index([ticketId])
+  @@map("notifications")
+}
+
+model DocumentRequest {
+  id                String                @id @default(uuid()) @db.Uuid
+  applicationId     String                @map("application_id") @db.Uuid
+  documentType      String                @map("document_type") @db.VarChar(100)
+  displayName       String                @map("display_name") @db.VarChar(200)
+  required          Boolean               @default(true)
+  status            DocumentRequestStatus @default(PENDING)
+  rejectionReason   String?               @map("rejection_reason") @db.Text
+  requestedByUserId String                @map("requested_by_user_id") @db.Uuid
+  requestedAt       DateTime              @default(now()) @map("requested_at") @db.Timestamptz(3)
+  reviewedByUserId  String?               @map("reviewed_by_user_id") @db.Uuid
+  reviewedAt        DateTime?             @map("reviewed_at") @db.Timestamptz(3)
+  application       Application           @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  requestedBy       User                  @relation("DocumentRequestCreator", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+  reviewedBy        User?                 @relation("DocumentRequestReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  document          Document?
+
+  @@unique([applicationId, documentType])
+  @@index([applicationId, status])
+  @@map("document_requests")
+}
+
+model Document {
+  id                String            @id @default(uuid()) @db.Uuid
+  applicationId     String            @map("application_id") @db.Uuid
+  documentRequestId String            @unique @map("document_request_id") @db.Uuid
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  application       Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  request           DocumentRequest   @relation(fields: [documentRequestId], references: [id], onDelete: Cascade)
+  versions          DocumentVersion[]
+
+  @@index([applicationId, createdAt])
+  @@map("documents")
+}
+
+model DocumentVersion {
+  id                 String            @id @default(uuid()) @db.Uuid
+  documentId         String            @map("document_id") @db.Uuid
+  version            Int
+  storageKey         String            @unique @map("storage_key") @db.VarChar(500)
+  originalName       String            @map("original_name") @db.VarChar(255)
+  mimeType           String            @map("mime_type") @db.VarChar(100)
+  sizeBytes          Int               @map("size_bytes")
+  checksumSha256     String            @map("checksum_sha256") @db.Char(64)
+  malwareScanStatus  MalwareScanStatus @default(PENDING) @map("malware_scan_status")
+  malwareScanDetails Json?             @map("malware_scan_details")
+  uploadedByUserId   String            @map("uploaded_by_user_id") @db.Uuid
+  uploadedAt         DateTime          @default(now()) @map("uploaded_at") @db.Timestamptz(3)
+  document           Document          @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  uploadedBy         User              @relation("DocumentVersionUploader", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([documentId, version])
+  @@index([documentId, uploadedAt])
+  @@index([malwareScanStatus, uploadedAt])
+  @@map("document_versions")
+}
+
+model AdvisorBankAccount {
+  id                     String            @id @default(uuid()) @db.Uuid
+  advisorId              String            @unique @map("advisor_id") @db.Uuid
+  accountHolder          String            @map("account_holder") @db.VarChar(160)
+  bankName               String            @map("bank_name") @db.VarChar(160)
+  accountNumberEncrypted String            @map("account_number_encrypted") @db.Text
+  accountNumberLastFour  String            @map("account_number_last_four") @db.Char(4)
+  ifsc                   String            @db.Char(11)
+  status                 AdvisorBankStatus @default(PENDING_VERIFICATION)
+  rejectionReason        String?           @map("rejection_reason") @db.Text
+  reviewedByUserId       String?           @map("reviewed_by_user_id") @db.Uuid
+  reviewedAt             DateTime?         @map("reviewed_at") @db.Timestamptz(3)
+  createdAt              DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  advisor                Advisor           @relation(fields: [advisorId], references: [id], onDelete: Cascade)
+  reviewedBy             User?             @relation("AdvisorBankReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([status, updatedAt])
+  @@map("advisor_bank_accounts")
+}
+
+model Lender {
+  id              String           @id @default(uuid()) @db.Uuid
+  name            String           @unique @db.VarChar(200)
+  type            LenderType
+  status          LenderStatus     @default(ACTIVE)
+  turnaroundDays  Int              @default(7) @map("turnaround_days")
+  contactPerson   String?          @map("contact_person") @db.VarChar(160)
+  email           String?          @db.VarChar(320)
+  phone           String?          @db.VarChar(20)
+  city            String?          @db.VarChar(100)
+  notes           String?          @db.Text
+  empanelledAt    DateTime         @default(now()) @map("empanelled_at") @db.Timestamptz(3)
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  productMappings ProductLender[]
+  commissionRules CommissionRule[]
+  applications    Application[]
+  payouts         Payout[]
+
+  @@index([status, type, createdAt])
+  @@index([city])
+  @@map("lenders")
+}
+
+model Product {
+  id              String               @id @default(uuid()) @db.Uuid
+  serviceType     String               @unique @map("service_type") @db.VarChar(80)
+  active          Boolean              @default(true)
+  tagline         String?              @db.VarChar(500)
+  minAmount       Decimal?             @map("min_amount") @db.Decimal(15, 2)
+  maxAmount       Decimal?             @map("max_amount") @db.Decimal(15, 2)
+  minTenureMonths Int?                 @map("min_tenure_months")
+  maxTenureMonths Int?                 @map("max_tenure_months")
+  interestFrom    Decimal?             @map("interest_from") @db.Decimal(7, 4)
+  interestTo      Decimal?             @map("interest_to") @db.Decimal(7, 4)
+  turnaroundDays  Int?                 @map("turnaround_days")
+  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+  lenders         ProductLender[]
+  eligibility     ProductEligibility[]
+  documents       ProductDocument[]
+  commissionRules CommissionRule[]
+
+  @@index([active, updatedAt])
+  @@map("products")
+}
+
+model ProductLender {
+  productId      String   @map("product_id") @db.Uuid
+  lenderId       String   @map("lender_id") @db.Uuid
+  active         Boolean  @default(true)
+  turnaroundDays Int?     @map("turnaround_days")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  lender         Lender   @relation(fields: [lenderId], references: [id], onDelete: Cascade)
+
+  @@id([productId, lenderId])
+  @@index([lenderId, active])
+  @@map("product_lenders")
+}
+
+model ProductEligibility {
+  id        String  @id @default(uuid()) @db.Uuid
+  productId String  @map("product_id") @db.Uuid
+  rule      String  @db.VarChar(500)
+  sortOrder Int     @default(0) @map("sort_order")
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, rule])
+  @@index([productId, sortOrder])
+  @@map("product_eligibility")
+}
+
+model ProductDocument {
+  id           String  @id @default(uuid()) @db.Uuid
+  productId    String  @map("product_id") @db.Uuid
+  documentType String  @map("document_type") @db.VarChar(100)
+  displayName  String  @map("display_name") @db.VarChar(200)
+  required     Boolean @default(true)
+  sortOrder    Int     @default(0) @map("sort_order")
+  product      Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, documentType])
+  @@index([productId, sortOrder])
+  @@map("product_documents")
+}
+
+model CommissionRule {
+  id              String                    @id @default(uuid()) @db.Uuid
+  productId       String                    @map("product_id") @db.Uuid
+  lenderId        String?                   @map("lender_id") @db.Uuid
+  version         Int
+  calculationType CommissionCalculationType @map("calculation_type")
+  percentageRate  Decimal?                  @map("percentage_rate") @db.Decimal(9, 6)
+  flatAmount      Decimal?                  @map("flat_amount") @db.Decimal(15, 2)
+  effectiveFrom   DateTime                  @map("effective_from") @db.Timestamptz(3)
+  effectiveTo     DateTime?                 @map("effective_to") @db.Timestamptz(3)
+  active          Boolean                   @default(true)
+  createdByUserId String                    @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime                  @default(now()) @map("created_at") @db.Timestamptz(3)
+  product         Product                   @relation(fields: [productId], references: [id], onDelete: Restrict)
+  lender          Lender?                   @relation(fields: [lenderId], references: [id], onDelete: Restrict)
+  createdBy       User                      @relation("CommissionRuleCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  payouts         Payout[]
+
+  @@index([productId, lenderId, active, effectiveFrom])
+  @@map("commission_rules")
+}
+
+model Payout {
+  id                String                    @id @default(uuid()) @db.Uuid
+  payoutNumber      String                    @unique @map("payout_number") @db.VarChar(40)
+  applicationId     String                    @unique @map("application_id") @db.Uuid
+  advisorId         String                    @map("advisor_id") @db.Uuid
+  lenderId          String                    @map("lender_id") @db.Uuid
+  commissionRuleId  String                    @map("commission_rule_id") @db.Uuid
+  commissionVersion Int                       @map("commission_version")
+  calculationType   CommissionCalculationType @map("calculation_type")
+  percentageRate    Decimal?                  @map("percentage_rate") @db.Decimal(9, 6)
+  flatAmount        Decimal?                  @map("flat_amount") @db.Decimal(15, 2)
+  disbursedAmount   Decimal                   @map("disbursed_amount") @db.Decimal(15, 2)
+  payoutAmount      Decimal                   @map("payout_amount") @db.Decimal(15, 2)
+  status            PayoutStatus              @default(PENDING)
+  paymentReference  String?                   @map("payment_reference") @db.VarChar(160)
+  paymentMethod     String?                   @map("payment_method") @db.VarChar(50)
+  paidAt            DateTime?                 @map("paid_at") @db.Timestamptz(3)
+  createdAt         DateTime                  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  application       Application               @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  advisor           Advisor                   @relation(fields: [advisorId], references: [id], onDelete: Restrict)
+  lender            Lender                    @relation(fields: [lenderId], references: [id], onDelete: Restrict)
+  commissionRule    CommissionRule            @relation(fields: [commissionRuleId], references: [id], onDelete: Restrict)
+  statusHistory     PayoutStatusHistory[]
+  notifications     Notification[]
+  supportTickets    SupportTicket[]
+
+  @@index([advisorId, status, createdAt])
+  @@index([lenderId, status, createdAt])
+  @@index([commissionRuleId])
+  @@map("payouts")
+}
+
+model PayoutStatusHistory {
+  id              String        @id @default(uuid()) @db.Uuid
+  payoutId        String        @map("payout_id") @db.Uuid
+  fromStatus      PayoutStatus? @map("from_status")
+  toStatus        PayoutStatus  @map("to_status")
+  note            String?       @db.Text
+  changedByUserId String        @map("changed_by_user_id") @db.Uuid
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  payout          Payout        @relation(fields: [payoutId], references: [id], onDelete: Cascade)
+  changedBy       User          @relation("PayoutStatusActor", fields: [changedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([payoutId, createdAt])
+  @@map("payout_status_history")
+}
+
+model SupportTicket {
+  id              String          @id @default(uuid()) @db.Uuid
+  ticketNumber    String          @unique @map("ticket_number") @db.VarChar(40)
+  advisorId       String          @map("advisor_id") @db.Uuid
+  createdByUserId String          @map("created_by_user_id") @db.Uuid
+  applicationId   String?         @map("application_id") @db.Uuid
+  payoutId        String?         @map("payout_id") @db.Uuid
+  assignedStaffId String?         @map("assigned_staff_id") @db.Uuid
+  subject         String          @db.VarChar(200)
+  category        TicketCategory
+  status          TicketStatus    @default(OPEN)
+  priority        TicketPriority  @default(NORMAL)
+  resolvedAt      DateTime?       @map("resolved_at") @db.Timestamptz(3)
+  closedAt        DateTime?       @map("closed_at") @db.Timestamptz(3)
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+  advisor         Advisor         @relation(fields: [advisorId], references: [id], onDelete: Restrict)
+  createdBy       User            @relation("SupportTicketCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  application     Application?    @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  payout          Payout?         @relation(fields: [payoutId], references: [id], onDelete: Restrict)
+  assignedStaff   Staff?          @relation(fields: [assignedStaffId], references: [id], onDelete: SetNull)
+  messages        TicketMessage[]
+  notifications   Notification[]
+
+  @@index([advisorId, status, updatedAt])
+  @@index([assignedStaffId, status, updatedAt])
+  @@index([priority, status, createdAt])
+  @@index([applicationId])
+  @@index([payoutId])
+  @@map("support_tickets")
+}
+
+model TicketMessage {
+  id           String        @id @default(uuid()) @db.Uuid
+  ticketId     String        @map("ticket_id") @db.Uuid
+  authorUserId String        @map("author_user_id") @db.Uuid
+  body         String        @db.Text
+  internal     Boolean       @default(false)
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  ticket       SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author       User          @relation("TicketMessageAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+
+  @@index([ticketId, createdAt])
+  @@map("ticket_messages")
+}
+
+model ExportJob {
+  id                String          @id @default(uuid()) @db.Uuid
+  requestedByUserId String          @map("requested_by_user_id") @db.Uuid
+  reportType        ReportType      @map("report_type")
+  format            ExportFormat
+  status            ExportJobStatus @default(QUEUED)
+  filters           Json?
+  fileName          String?         @map("file_name") @db.VarChar(255)
+  filePath          String?         @map("file_path") @db.VarChar(1000)
+  mimeType          String?         @map("mime_type") @db.VarChar(100)
+  rowCount          Int?            @map("row_count")
+  errorMessage      String?         @map("error_message") @db.Text
+  startedAt         DateTime?       @map("started_at") @db.Timestamptz(3)
+  completedAt       DateTime?       @map("completed_at") @db.Timestamptz(3)
+  expiresAt         DateTime?       @map("expires_at") @db.Timestamptz(3)
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+  requestedBy       User            @relation("ExportJobRequester", fields: [requestedByUserId], references: [id], onDelete: Cascade)
+
+  @@index([requestedByUserId, status, createdAt])
+  @@index([status, createdAt])
+  @@index([expiresAt])
+  @@map("export_jobs")
+}

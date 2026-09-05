@@ -12,8 +12,8 @@ import type { Role } from '@/types';
 const COLLAPSE_KEY = 'cibilon.sidebar.collapsed';
 
 export function AppLayout({ role }: { role: Role }) {
-  const { user, logout } = useAuth();
-  const { notifications, documents, payouts, applications, setAuditActor } = useData();
+  const { user, loading: authLoading, logout } = useAuth();
+  const { notifications, documents, payouts, applications, setAuditActor, loading, error, refresh } = useData();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -52,15 +52,16 @@ export function AppLayout({ role }: { role: Role }) {
   const advisorId = user?.id ?? '';
 
   const counts = useMemo(() => {
-    const scopedApps =
-      role === 'admin' ? applications : applications.filter((a) => a.advisorId === advisorId);
+    const scopedApps = role === 'advisor'
+      ? applications.filter((a) => a.advisorId === advisorId)
+      : applications;
     const scopedIds = new Set(scopedApps.map((a) => a.id));
     return {
       notifications: notifications.filter((n) => n.audience === role && !n.read).length,
       pendingDocs: documents.filter(
         (d) =>
           scopedIds.has(d.applicationId) &&
-          (role === 'admin'
+          (role !== 'advisor'
             ? d.status === 'Under Verification' || d.status === 'Uploaded'
             : d.status === 'Pending' ||
               d.status === 'Re-upload Required' ||
@@ -70,14 +71,20 @@ export function AppLayout({ role }: { role: Role }) {
     };
   }, [applications, documents, notifications, payouts, role, advisorId]);
 
+  if (authLoading) return <div className="flex min-h-dvh items-center justify-center text-sm text-slate-500">Restoring your session…</div>;
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   if (user.role !== role) {
-    return <Navigate to={user.role === 'admin' ? '/admin/dashboard' : '/app/dashboard'} replace />;
+    const home = user.role === 'admin'
+      ? '/admin/dashboard'
+      : user.role === 'staff'
+        ? '/staff/applications'
+        : '/app/dashboard';
+    return <Navigate to={home} replace />;
   }
 
-  const confirmLogout = () => {
+  const confirmLogout = async () => {
     setLogoutOpen(false);
-    logout();
+    await logout();
     navigate('/login', { replace: true });
   };
 
@@ -137,11 +144,18 @@ export function AppLayout({ role }: { role: Role }) {
         />
         <main className="min-w-0 flex-1 px-3 py-5 sm:px-5 lg:px-7">
           <div className="mx-auto w-full max-w-[1400px]">
+            {error && (
+              <div className="mb-4 flex items-center justify-between rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                <span>{error}</span>
+                <button className="font-medium underline" onClick={() => void refresh()}>Retry</button>
+              </div>
+            )}
+            {loading && <p className="mb-3 text-xs text-slate-400">Refreshing workspace data…</p>}
             <Outlet />
           </div>
         </main>
         <footer className="border-t border-slate-200 px-5 py-4 text-center text-xs text-slate-400">
-          Cibilon Pvt. Ltd. · Advisor CRM v0.1 · Demonstration build with sample data
+          Cibilon Pvt. Ltd. · Advisor CRM
         </footer>
       </div>
 

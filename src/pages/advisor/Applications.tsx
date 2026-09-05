@@ -21,7 +21,6 @@ import { FilterBar } from '@/components/crm/FilterBar';
 import { APPLICATION_STATUSES, SERVICES } from '@/lib/constants';
 import { ACTIVE_STATUSES, COMPLETED_STATUSES } from '@/lib/metrics';
 import { formatCurrency, formatDate, matchesQuery, relativeTime } from '@/lib/utils';
-import { useMockLoading } from '@/hooks/useMockLoading';
 import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/store/AuthContext';
 import { useData } from '@/store/DataContext';
@@ -58,8 +57,7 @@ export function Applications() {
   const navigate = useNavigate();
   const toast = useToast();
   const { user } = useAuth();
-  const { applications, documents } = useData();
-  const loading = useMockLoading();
+  const { applications, documents, loading } = useData();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [tab, setTab] = useState('all');

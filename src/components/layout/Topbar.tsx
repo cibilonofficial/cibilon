@@ -22,7 +22,7 @@ export function Topbar({ user, onOpenDrawer, onOpenSearch }: TopbarProps) {
   const bellRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const base = user.role === 'admin' ? '/admin' : '/app';
+  const base = user.role === 'admin' ? '/admin' : user.role === 'staff' ? '/staff' : '/app';
   const mine = notifications.filter((n) => n.audience === user.role);
   const unread = mine.filter((n) => !n.read);
 
@@ -161,10 +161,10 @@ export function Topbar({ user, onOpenDrawer, onOpenSearch }: TopbarProps) {
                 <p className="truncate text-sm font-semibold text-slate-900">{user.name}</p>
                 <p className="truncate text-xs text-slate-500">{user.email}</p>
                 <p className="mt-1.5 inline-flex rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
-                  {user.role === 'admin' ? 'Super Admin' : 'Financial Advisor'}
+                  {user.role === 'admin' ? 'Super Admin' : user.role === 'staff' ? 'Operations Staff' : 'Financial Advisor'}
                 </p>
               </div>
-              <div className="p-1.5">
+              {user.role !== 'staff' && <div className="p-1.5">
                 <Link
                   to={`${base}/profile`}
                   onClick={() => setMenuOpen(false)}
@@ -181,7 +181,7 @@ export function Topbar({ user, onOpenDrawer, onOpenSearch }: TopbarProps) {
                   <Settings className="size-4 text-slate-400" />
                   Account settings
                 </Link>
-              </div>
+              </div>}
               <div className="border-t border-slate-200 p-1.5">
                 <button
                   type="button"

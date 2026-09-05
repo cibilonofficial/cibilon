@@ -2,77 +2,132 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from 'react';
-import { DEMO_ACCOUNTS } from '@/data/mockData';
-import type { AuthUser } from '@/types';
+import { apiRequest, errorMessage, setApiAccessToken } from '@/lib/api';
+import type { AuthUser, Role } from '@/types';
 
 const STORAGE_KEY = 'ciblon.session';
 
+interface BackendIdentity {
+  id: string; name: string; email: string; mobile: string; roles: string[];
+  permissions: string[]; advisorId?: string | null; staffId?: string | null;
+  code?: string | null; agency?: string | null;
+}
+
+interface StoredSession { user: AuthUser; accessToken: string; remember: boolean }
+interface LoginResult { error: string | null; role?: Role }
 interface AuthContextValue {
   user: AuthUser | null;
-  /** Resolves to an error message, or null on success. */
-  login: (identifier: string, password: string, remember: boolean) => Promise<string | null>;
-  logout: () => void;
+  loading: boolean;
+  login: (identifier: string, password: string, remember: boolean) => Promise<LoginResult>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function readStoredSession(): AuthUser | null {
+function mapIdentity(identity: BackendIdentity): AuthUser {
+  const role: Role = identity.roles.includes('admin')
+    ? 'admin'
+    : identity.staffId
+      ? 'staff'
+      : 'advisor';
+  return {
+    id: identity.advisorId ?? identity.staffId ?? identity.id,
+    name: identity.name,
+    email: identity.email,
+    mobile: identity.mobile,
+    role,
+    permissions: identity.permissions,
+    code: identity.code ?? '',
+    agency: identity.agency ?? undefined,
+    avatarColor: role === 'advisor' ? '#0f766e' : '#4338ca',
+  };
+}
+
+function readStoredSession(): StoredSession | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY) ?? sessionStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as AuthUser) : null;
+    return raw ? JSON.parse(raw) as StoredSession : null;
   } catch {
     return null;
   }
 }
 
+function clearStoredSession() {
+  localStorage.removeItem(STORAGE_KEY);
+  sessionStorage.removeItem(STORAGE_KEY);
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(() => readStoredSession());
+  const stored = useMemo(readStoredSession, []);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setApiAccessToken(stored?.accessToken ?? null);
+    const bootstrap = stored?.accessToken
+      ? apiRequest<{ data: BackendIdentity }>('/me', { skipRefresh: true })
+          .then(({ data }) => ({ user: data, accessToken: stored.accessToken }))
+          .catch(() => apiRequest<{ data: { user: BackendIdentity; accessToken: string } }>('/auth/refresh', { method: 'POST', skipRefresh: true }).then((response) => response.data))
+      : apiRequest<{ data: { user: BackendIdentity; accessToken: string } }>('/auth/refresh', { method: 'POST', skipRefresh: true }).then((response) => response.data);
+    bootstrap.then((data) => {
+      if (cancelled) return;
+      const nextUser = mapIdentity(data.user);
+      setApiAccessToken(data.accessToken);
+      setUser(nextUser);
+      const remember = stored?.remember ?? false;
+      (remember ? localStorage : sessionStorage).setItem(
+        STORAGE_KEY,
+        JSON.stringify({ user: nextUser, accessToken: data.accessToken, remember }),
+      );
+    }).catch(() => {
+      clearStoredSession();
+      setApiAccessToken(null);
+      setUser(null);
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [stored]);
 
   const login = useCallback(
-    async (identifier: string, password: string, remember: boolean): Promise<string | null> => {
-      // Stands in for POST /auth/login. Swap the body for a fetch call later.
-      await new Promise((resolve) => setTimeout(resolve, 700));
-
-      const needle = identifier.trim().toLowerCase().replace(/\s+/g, '');
-      const digits = needle.replace(/\D/g, '');
-      const normalizedNeedle = needle.replace(/ciblon/g, 'cibilon');
-      const account = DEMO_ACCOUNTS.find(
-        (a) =>
-          a.email.toLowerCase() === needle ||
-          a.email.toLowerCase() === normalizedNeedle ||
-          (digits.length >= 10 && a.mobile.replace(/\D/g, '').endsWith(digits)),
-      );
-
-      if (!account) return 'We could not find an account with those details.';
-      if (
-        password !== account.password &&
-        password !== 'ciblon@123' &&
-        password !== 'cibilon@123'
-      ) {
-        return 'Incorrect password. Please try again.';
+    async (identifier: string, password: string, remember: boolean): Promise<LoginResult> => {
+      try {
+        const { data } = await apiRequest<{ data: { accessToken: string; user: BackendIdentity } }>('/auth/login', {
+          method: 'POST', body: { identifier, password, remember }, skipRefresh: true,
+        });
+        const nextUser = mapIdentity(data.user);
+        clearStoredSession();
+        setApiAccessToken(data.accessToken);
+        setUser(nextUser);
+        (remember ? localStorage : sessionStorage).setItem(
+          STORAGE_KEY,
+          JSON.stringify({ user: nextUser, accessToken: data.accessToken, remember }),
+        );
+        return { error: null, role: nextUser.role };
+      } catch (error) {
+        return { error: errorMessage(error) };
       }
-
-      const { password: _password, ...session } = account;
-      void _password;
-      setUser(session);
-      const store = remember ? localStorage : sessionStorage;
-      store.setItem(STORAGE_KEY, JSON.stringify(session));
-      return null;
     },
     [],
   );
 
-  const logout = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY);
-    sessionStorage.removeItem(STORAGE_KEY);
-    setUser(null);
+  const logout = useCallback(async () => {
+    try {
+      await apiRequest<void>('/auth/logout', { method: 'POST', skipRefresh: true });
+    } finally {
+      clearStoredSession();
+      setApiAccessToken(null);
+      setUser(null);
+    }
   }, []);
 
-  const value = useMemo(() => ({ user, login, logout }), [user, login, logout]);
+  const value = useMemo(() => ({ user, loading, login, logout }), [user, loading, login, logout]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

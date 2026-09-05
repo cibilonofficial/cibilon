@@ -22,7 +22,6 @@ import {
 import { useToast } from '@/components/ui/Toast';
 import { LENDER_STATUSES, LENDER_TYPES, SERVICES } from '@/lib/constants';
 import { formatDate, matchesQuery, uid } from '@/lib/utils';
-import { useMockLoading } from '@/hooks/useMockLoading';
 import { useData } from '@/store/DataContext';
 import type { Lender, LenderStatus, LenderType, ServiceType } from '@/types';
 
@@ -44,8 +43,7 @@ const BLANK: Lender = {
 
 export function AdminLenders() {
   const toast = useToast();
-  const { lenders, applications, saveLender, setLenderStatus } = useData();
-  const loading = useMockLoading();
+  const { lenders, applications, saveLender, setLenderStatus, loading } = useData();
 
   const [query, setQuery] = useState('');
   const [type, setType] = useState('');

@@ -10,18 +10,19 @@ import { StatCard } from '@/components/ui/StatCard';
 import { Chip } from '@/components/ui/StatusBadge';
 import { TBody, TD, TH, THead, TR, TableWrap } from '@/components/ui/Table';
 import { useToast } from '@/components/ui/Toast';
-import { MONTHLY_TREND } from '@/data/mockData';
 import { SERVICES } from '@/lib/constants';
 import {
   ACTIVE_STATUSES,
   COMPLETED_STATUSES,
   advisorRollup,
   computeMetrics,
+  monthlyTrend,
   serviceDistribution,
   statusDistribution,
 } from '@/lib/metrics';
 import { formatCompactCurrency, formatCurrency, formatNumber } from '@/lib/utils';
 import { useData } from '@/store/DataContext';
+import { apiDownload, apiRequest, errorMessage } from '@/lib/api';
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
@@ -37,6 +38,7 @@ export function AdminReports() {
   const { applications, documents, payouts, advisors, lenders } = useData();
 
   const [tab, setTab] = useState('overview');
+  const [exporting, setExporting] = useState(false);
   const [query, setQuery] = useState('');
   const [service, setService] = useState('');
   const [from, setFrom] = useState('');
@@ -165,8 +167,32 @@ export function AdminReports() {
   }, [scoped, scopedPayouts]);
 
   const activeFilters = [service, from, to].filter(Boolean).length;
-  const exportReport = () =>
-    toast.info('Export queued', 'The report will be emailed as a CSV attachment.');
+  const trend = useMemo(() => monthlyTrend(scoped, scopedPayouts), [scoped, scopedPayouts]);
+  const exportReport = async () => {
+    setExporting(true);
+    try {
+      const reportType = tab === 'advisors' ? 'ADVISORS' : tab === 'payouts' ? 'PAYOUTS' : tab === 'partners' ? 'LENDERS' : 'APPLICATIONS';
+      const queued = await apiRequest<{ data: { id: string } }>('/reports/exports', {
+        method: 'POST',
+        body: { reportType, format: 'CSV', filters: { ...(service ? { serviceType: service } : {}), ...(from ? { dateFrom: from } : {}), ...(to ? { dateTo: to } : {}) } },
+      });
+      toast.info('Export queued', 'Preparing your CSV download…');
+      let completed = false;
+      for (let attempt = 0; attempt < 45; attempt += 1) {
+        const job = await apiRequest<{ data: { status: string; errorMessage?: string } }>(`/reports/exports/${queued.data.id}`);
+        if (job.data.status === 'FAILED') throw new Error(job.data.errorMessage ?? 'Export failed');
+        if (job.data.status === 'COMPLETED') { completed = true; break; }
+        await new Promise((resolve) => window.setTimeout(resolve, 500));
+      }
+      if (!completed) throw new Error('The export is still processing. Try again shortly.');
+      const { blob, fileName } = await apiDownload(`/reports/exports/${queued.data.id}/download`);
+      const url = URL.createObjectURL(blob); const anchor = document.createElement('a');
+      anchor.href = url; anchor.download = fileName; anchor.click(); URL.revokeObjectURL(url);
+      toast.success('Report downloaded', fileName);
+    } catch (requestError) {
+      toast.error('Export failed', errorMessage(requestError));
+    } finally { setExporting(false); }
+  };
 
   return (
     <>
@@ -174,7 +200,7 @@ export function AdminReports() {
         title="Reports"
         description="Network performance across advisors, products, lenders and payouts."
         actions={
-          <Button variant="secondary" icon={<Download className="size-4" />} onClick={exportReport}>
+          <Button variant="secondary" icon={<Download className="size-4" />} loading={exporting} onClick={() => void exportReport()}>
             Export report
           </Button>
         }
@@ -252,7 +278,7 @@ export function AdminReports() {
               <Card>
                 <CardHeader title="Volume by month" subtitle="Submitted vs disbursed" />
                 <CardBody>
-                  <VolumeBars data={monthlyDisbursement.length > 1 ? monthlyDisbursement : MONTHLY_TREND} />
+                  <VolumeBars data={monthlyDisbursement.length > 1 ? monthlyDisbursement : trend} />
                 </CardBody>
               </Card>
               <Card>
@@ -270,7 +296,7 @@ export function AdminReports() {
               <Card>
                 <CardHeader title="Payout outflow" subtitle="Rolling six months" />
                 <CardBody>
-                  <PayoutTrend data={MONTHLY_TREND} />
+                  <PayoutTrend data={trend} />
                 </CardBody>
               </Card>
             </div>
@@ -380,7 +406,7 @@ export function AdminReports() {
               <Card>
                 <CardHeader title="Disbursement trend" subtitle="Files created vs disbursed" />
                 <CardBody>
-                  <VolumeBars data={monthlyDisbursement.length > 1 ? monthlyDisbursement : MONTHLY_TREND} />
+                  <VolumeBars data={monthlyDisbursement.length > 1 ? monthlyDisbursement : trend} />
                 </CardBody>
               </Card>
               <TableWrap className="min-w-full">
@@ -534,7 +560,7 @@ export function AdminReports() {
           title="Top advisors this cycle"
           subtitle="Ranked by payout earned inside the current filters"
           action={
-            <Button variant="secondary" size="sm" icon={<Users className="size-3.5" />} onClick={exportReport}>
+            <Button variant="secondary" size="sm" icon={<Users className="size-3.5" />} loading={exporting} onClick={() => void exportReport()}>
               Export
             </Button>
           }

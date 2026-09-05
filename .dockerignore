@@ -1,0 +1,14 @@
+.git
+.env
+.env.*
+!.env.example
+!.env.production.example
+!.env.neon.example
+node_modules
+dist
+server/dist
+server/generated
+storage
+backups
+.docker-cli
+*.log

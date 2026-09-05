@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { BadgeCheck, Camera, Landmark, Save, ShieldCheck, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody, DetailItem } from '@/components/ui/Card';
@@ -13,16 +14,20 @@ import { formatCompactCurrency, formatDate, maskId } from '@/lib/utils';
 import { useAuth } from '@/store/AuthContext';
 import { useData } from '@/store/DataContext';
 import type { AdvisorProfile } from '@/types';
+import { apiRequest, errorMessage } from '@/lib/api';
 
 export function Profile() {
   const toast = useToast();
-  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const { profile, updateProfile, applications, payouts, advisors } = useData();
   const photoInput = useRef<HTMLInputElement>(null);
 
   const [tab, setTab] = useState('details');
   const [draft, setDraft] = useState<AdvisorProfile>(profile);
   const [saving, setSaving] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwords, setPasswords] = useState({ current: '', next: '', confirm: '' });
 
   const advisor = advisors.find((a) => a.id === user!.id);
   const rollup = advisorRollup(user!.id, applications, payouts);
@@ -33,10 +38,26 @@ export function Profile() {
 
   const save = async () => {
     setSaving(true);
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    updateProfile(draft);
-    setSaving(false);
-    toast.success('Profile updated', 'Your details have been saved.');
+    try {
+      await updateProfile(draft);
+      toast.success('Profile updated', 'Your details have been saved.');
+    } catch (requestError) {
+      toast.error('Update failed', errorMessage(requestError));
+    } finally { setSaving(false); }
+  };
+
+  const changePassword = async () => {
+    if (!passwords.current || passwords.next.length < 12) {
+      toast.error('Check your password', 'The new password must be at least 12 characters.'); return;
+    }
+    if (passwords.next !== passwords.confirm) { toast.error('Passwords do not match'); return; }
+    setChangingPassword(true);
+    try {
+      await apiRequest('/auth/change-password', { method: 'POST', body: { currentPassword: passwords.current, newPassword: passwords.next } });
+      await logout(); toast.success('Password changed', 'Please sign in with your new password.');
+      navigate('/login', { replace: true });
+    } catch (requestError) { toast.error('Password not changed', errorMessage(requestError)); }
+    finally { setChangingPassword(false); }
   };
 
   const onPhoto = (files: FileList | null) => {
@@ -48,8 +69,7 @@ export function Profile() {
     }
     const url = URL.createObjectURL(file);
     set('photo', url);
-    updateProfile({ photo: url });
-    toast.success('Photo updated');
+    toast.info('Photo selected', 'Save changes to update your profile.');
   };
 
   return (
@@ -109,7 +129,6 @@ export function Profile() {
                   type="button"
                   onClick={() => {
                     set('photo', null);
-                    updateProfile({ photo: null });
                   }}
                   className="mt-3 inline-flex items-center gap-1 text-xs text-slate-400 hover:text-rose-600"
                 >
@@ -298,16 +317,15 @@ export function Profile() {
               <div>
                 <SectionTitle>Change password</SectionTitle>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Input label="Current password" type="password" placeholder="••••••••" />
+                  <Input label="Current password" type="password" placeholder="••••••••" value={passwords.current} onChange={(event) => setPasswords((value) => ({ ...value, current: event.target.value }))} />
                   <div className="hidden sm:block" />
-                  <Input label="New password" type="password" placeholder="••••••••" />
-                  <Input label="Confirm new password" type="password" placeholder="••••••••" />
+                  <Input label="New password" type="password" placeholder="••••••••" value={passwords.next} onChange={(event) => setPasswords((value) => ({ ...value, next: event.target.value }))} />
+                  <Input label="Confirm new password" type="password" placeholder="••••••••" value={passwords.confirm} onChange={(event) => setPasswords((value) => ({ ...value, confirm: event.target.value }))} />
                 </div>
                 <Button
                   className="mt-4"
-                  onClick={() =>
-                    toast.info('Not available in this build', 'Password changes need the backend.')
-                  }
+                  loading={changingPassword}
+                  onClick={() => void changePassword()}
                 >
                   Update password
                 </Button>

@@ -34,6 +34,7 @@ import { AdminTeam } from '@/pages/admin/AdminTeam';
 import { ApplicationDetails } from '@/pages/shared/ApplicationDetails';
 import { LeadDetails } from '@/pages/shared/LeadDetails';
 import { Notifications } from '@/pages/shared/Notifications';
+import { StaffApplications } from '@/pages/staff/StaffApplications';
 
 export default function App() {
   return (
@@ -60,6 +61,15 @@ export default function App() {
                 <Route path="notifications" element={<Notifications />} />
                 <Route path="profile" element={<Profile />} />
                 <Route path="support" element={<Support />} />
+              </Route>
+
+              {/* Staff workspace — assigned applications only */}
+              <Route path="/staff" element={<AppLayout role="staff" />}>
+                <Route index element={<Navigate to="/staff/applications" replace />} />
+                <Route path="applications" element={<StaffApplications />} />
+                <Route path="applications/:id" element={<ApplicationDetails />} />
+                <Route path="notifications" element={<Notifications />} />
+                <Route path="*" element={<Navigate to="/staff/applications" replace />} />
               </Route>
 
               {/* Super Admin console */}

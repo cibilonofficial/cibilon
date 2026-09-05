@@ -23,10 +23,9 @@ import {
 } from '@/components/ui/Table';
 import { FilterBar } from '@/components/crm/FilterBar';
 import { useToast } from '@/components/ui/Toast';
-import { APPLICATION_STATUSES, SERVICES } from '@/lib/constants';
+import { APPLICATION_STATUSES, APPLICATION_STATUS_TRANSITIONS, SERVICES } from '@/lib/constants';
 import { ACTIVE_STATUSES, COMPLETED_STATUSES } from '@/lib/metrics';
 import { formatCurrency, matchesQuery, relativeTime } from '@/lib/utils';
-import { useMockLoading } from '@/hooks/useMockLoading';
 import { useAuth } from '@/store/AuthContext';
 import { useData } from '@/store/DataContext';
 import type { Application, ApplicationStatus } from '@/types';
@@ -58,8 +57,7 @@ export function AdminApplications() {
   const navigate = useNavigate();
   const toast = useToast();
   const { user } = useAuth();
-  const { applications, advisors, updateApplicationStatus } = useData();
-  const loading = useMockLoading();
+  const { applications, advisors, updateApplicationStatus, loading } = useData();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [tab, setTab] = useState('all');
@@ -116,13 +114,13 @@ export function AdminApplications() {
   const saveStatus = async () => {
     if (!target || !nextStatus) return;
     setSaving(true);
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    updateApplicationStatus(target.id, nextStatus, remarks, user!.name);
-    setSaving(false);
-    setTarget(null);
-    setRemarks('');
-    setNextStatus('');
-    toast.success('Status updated', `${target.id} is now ${nextStatus}.`);
+    try {
+      await updateApplicationStatus(target.id, nextStatus, remarks, user!.name);
+      setTarget(null); setRemarks(''); setNextStatus('');
+      toast.success('Status updated', `${target.id} is now ${nextStatus}.`);
+    } catch (error) {
+      toast.error('Status not updated', error instanceof Error ? error.message : 'Please try again.');
+    } finally { setSaving(false); }
   };
 
   return (
@@ -301,7 +299,7 @@ export function AdminApplications() {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setTarget(app);
-                                setNextStatus(app.status);
+                                setNextStatus('');
                               }}
                             >
                               Update
@@ -350,7 +348,7 @@ export function AdminApplications() {
                         onClick={(e) => {
                           e.stopPropagation();
                           setTarget(app);
-                          setNextStatus(app.status);
+                          setNextStatus('');
                         }}
                       >
                         Update status
@@ -400,7 +398,7 @@ export function AdminApplications() {
             <Select
               label="New status"
               required
-              options={APPLICATION_STATUSES}
+              options={APPLICATION_STATUS_TRANSITIONS[target.status] ?? []}
               value={nextStatus}
               onChange={(e) => setNextStatus(e.target.value as ApplicationStatus)}
             />
@@ -411,10 +409,10 @@ export function AdminApplications() {
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
             />
-            {(nextStatus === 'Disbursed' || nextStatus === 'Completed') && (
+            {['Approved', 'Disbursed', 'Completed'].includes(nextStatus) && (
               <p className="rounded-lg border border-money-500/20 bg-money-50 px-3 py-2.5 text-[13px] text-money-700">
-                A payout of {formatCurrency(target.expectedPayout)} will be raised for{' '}
-                {target.advisorName}.
+                Estimated payout on disbursal: {formatCurrency(target.expectedPayout)} for{' '}
+                {target.advisorName}. Approval does not release a payout. The final amount depends on the lender and actual disbursal.
               </p>
             )}
           </div>
