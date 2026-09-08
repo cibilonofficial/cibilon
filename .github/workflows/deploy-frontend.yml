@@ -12,8 +12,30 @@ on:
       - 'package*.json'
 
 jobs:
+  build-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run db:generate
+
+      - name: Type check
+        run: npx tsc -p tsconfig.app.json --noEmit
+
+      - name: Build frontend
+        run: npm run build
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+
   deploy:
     runs-on: ubuntu-latest
+    needs: build-check
     permissions:
       contents: read
       deployments: write

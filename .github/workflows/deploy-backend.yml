@@ -11,8 +11,67 @@ on:
       - 'tsconfig.server.json'
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: cibilon_test
+          POSTGRES_PASSWORD: cibilon_test
+          POSTGRES_DB: cibilon_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run db:generate
+      - name: Prepare test database
+        run: node scripts/prepare-test-db.mjs
+        env:
+          TEST_DATABASE_URL: postgresql://cibilon_test:cibilon_test@localhost:5432/cibilon_test
+          DATABASE_URL: postgresql://cibilon_test:cibilon_test@localhost:5432/cibilon_test
+          SEED_DEFAULT_PASSWORD: cibilon@123
+          DATA_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          DOCUMENT_ENCRYPTION_KEY: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
+      - name: Run unit tests
+        run: npm run test:unit
+        env:
+          TEST_DATABASE_URL: postgresql://cibilon_test:cibilon_test@localhost:5432/cibilon_test
+      - name: Run integration tests
+        run: npm run test:integration
+        env:
+          TEST_DATABASE_URL: postgresql://cibilon_test:cibilon_test@localhost:5432/cibilon_test
+          DATABASE_URL: postgresql://cibilon_test:cibilon_test@localhost:5432/cibilon_test
+          SEED_DEFAULT_PASSWORD: cibilon@123
+          DATA_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          DOCUMENT_ENCRYPTION_KEY: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
+
+  build-check:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run db:generate
+      - name: Verify API builds cleanly
+        run: npm run build:api
+
   deploy:
     runs-on: ubuntu-latest
+    needs: build-check
     steps:
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.0.3
@@ -40,11 +99,19 @@ jobs:
             set -a; source /opt/cibilon/.env.production; set +a
             npx prisma migrate deploy
 
-            echo "── restarting services ──"
-            pm2 restart cibilon-api cibilon-worker
+            echo "── blue/green swap ──"
+            pm2 reload cibilon-api --update-env
 
             echo "── health check ──"
-            sleep 4
-            curl -sf http://127.0.0.1:4000/api/v1/health || (pm2 logs cibilon-api --lines 20 && exit 1)
+            sleep 5
+            curl -sf http://127.0.0.1:4000/api/v1/health || (
+              echo "❌ Health check failed — rolling back"
+              git stash
+              npm run build:api
+              pm2 reload cibilon-api --update-env
+              exit 1
+            )
 
+            pm2 reload cibilon-worker --update-env
+            pm2 save
             echo "✅ Backend deployed"
