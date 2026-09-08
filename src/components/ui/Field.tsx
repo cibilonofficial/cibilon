@@ -9,8 +9,8 @@ import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const CONTROL =
-  'w-full rounded-lg border bg-white px-3 text-sm text-slate-900 transition-colors placeholder:text-slate-400 ' +
-  'focus:outline-none focus:ring-2 focus:ring-brand-500/25 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500';
+  'w-full rounded-xl border bg-white/95 px-3.5 text-sm text-slate-900 shadow-sm transition-all placeholder:text-slate-400 ' +
+  'hover:border-slate-400 focus:outline-none focus:ring-4 focus:ring-brand-500/10 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500';
 
 const OK = 'border-slate-300 focus:border-brand-500';
 const BAD = 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/20';
@@ -98,7 +98,7 @@ export function Input({
           {...rest}
           className={cn(
             CONTROL,
-            'h-10',
+            'h-11',
             error ? BAD : OK,
             prefix ? 'pl-8' : null,
             suffix ? 'pr-10' : null,
@@ -153,7 +153,7 @@ export function Select({
           {...rest}
           className={cn(
             CONTROL,
-            'h-10 appearance-none pr-9',
+            'h-11 appearance-none pr-9',
             error ? BAD : OK,
             !rest.value && 'text-slate-400',
             className,
@@ -245,10 +245,10 @@ export function RadioCards({
             <label
               key={option.value}
               className={cn(
-                'flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors',
+                'flex cursor-pointer items-start gap-3 rounded-2xl border p-4 shadow-sm transition-all',
                 active
-                  ? 'border-brand-500 bg-brand-50/60 ring-1 ring-brand-500'
-                  : 'border-slate-300 bg-white hover:border-slate-400 hover:bg-slate-50',
+                  ? 'border-brand-500 bg-brand-50/70 ring-2 ring-brand-500/15'
+                  : 'border-slate-200 bg-white hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-card',
               )}
             >
               <input

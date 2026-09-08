@@ -33,8 +33,10 @@ import { ServiceBars, StatusDonut, VolumeBars } from '@/components/charts/Charts
 import { advisorRollup, computeMetrics, monthlyTrend, serviceDistribution, statusDistribution } from '@/lib/metrics';
 import { formatCompactCurrency, formatCurrency, relativeTime } from '@/lib/utils';
 import { useData } from '@/store/DataContext';
+import { comparisonProps, useMonthlyComparisons } from '@/hooks/useMonthlyComparisons';
 
 export function AdminDashboard() {
+  const comparisons = useMonthlyComparisons();
   const navigate = useNavigate();
   const { applications, documents, payouts, advisors, loading } = useData();
 
@@ -107,8 +109,7 @@ export function AdminDashboard() {
               value={metrics.totalLeads}
               icon={<Layers className="size-4" />}
               tone="neutral"
-              delta={14}
-              deltaLabel="vs last month"
+              {...comparisonProps(comparisons?.leads)}
             />
             <StatCard
               label="Active applications"

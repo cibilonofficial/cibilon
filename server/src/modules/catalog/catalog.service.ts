@@ -27,7 +27,8 @@ const productInclude = {
   eligibility: { orderBy: [{ sortOrder: 'asc' as const }, { rule: 'asc' as const }] },
   documents: { orderBy: [{ sortOrder: 'asc' as const }, { displayName: 'asc' as const }] },
   commissionRules: {
-    where: { lenderId: null, active: true },
+    where: { active: true },
+    include: { lender: { select: { id: true, name: true } } },
     orderBy: [{ effectiveFrom: 'desc' as const }, { version: 'desc' as const }],
   },
   _count: { select: { commissionRules: true } },
@@ -51,6 +52,9 @@ function isPrismaCode(error: unknown, code: string) {
 function serializeProduct(product: ProductRecord) {
   const now = new Date();
   const defaultCommissionRule = product.commissionRules.find(
+    (rule) => rule.lenderId === null && rule.effectiveFrom <= now && (!rule.effectiveTo || rule.effectiveTo > now),
+  );
+  const currentCommissionRules = product.commissionRules.filter(
     (rule) => rule.effectiveFrom <= now && (!rule.effectiveTo || rule.effectiveTo > now),
   );
   return {
@@ -62,6 +66,7 @@ function serializeProduct(product: ProductRecord) {
     defaultCommissionRule: defaultCommissionRule
       ? serializeCommissionRule(defaultCommissionRule)
       : null,
+    commissionOptions: currentCommissionRules.map(serializeCommissionRule),
     commissionRules: undefined,
     lenders: product.lenders.map((mapping) => ({
       productId: mapping.productId,

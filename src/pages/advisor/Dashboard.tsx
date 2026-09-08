@@ -25,8 +25,10 @@ import { computeMetrics, monthlyTrend, statusDistribution } from '@/lib/metrics'
 import { formatCompactCurrency, formatCurrency, formatDate, relativeTime } from '@/lib/utils';
 import { useAuth } from '@/store/AuthContext';
 import { useData } from '@/store/DataContext';
+import { comparisonProps, useMonthlyComparisons } from '@/hooks/useMonthlyComparisons';
 
 export function AdvisorDashboard() {
+  const comparisons = useMonthlyComparisons();
   const { user } = useAuth();
   const navigate = useNavigate();
   const { applications, documents, payouts, notifications, loading } = useData();
@@ -90,8 +92,7 @@ export function AdvisorDashboard() {
               value={metrics.totalLeads}
               icon={<Users className="size-4" />}
               tone="brand"
-              delta={12}
-              deltaLabel="vs last month"
+              {...comparisonProps(comparisons?.leads)}
               onClick={() => navigate('/app/leads')}
             />
             <StatCard
@@ -103,21 +104,20 @@ export function AdvisorDashboard() {
               onClick={() => navigate('/app/applications?status=active')}
             />
             <StatCard
-              label="Applications completed"
-              value={metrics.completed}
+              label="Applications approved"
+              value={metrics.approved}
               icon={<BadgeCheck className="size-4" />}
               tone="money"
-              delta={8}
-              deltaLabel="vs last month"
-              onClick={() => navigate('/app/applications?status=Completed')}
+              {...comparisonProps(comparisons?.approved)}
+              onClick={() => navigate('/app/applications?status=Approved')}
             />
             <StatCard
               label="Applications rejected"
               value={metrics.rejected}
               icon={<CircleSlash className="size-4" />}
               tone="danger"
-              delta={-3}
-              deltaLabel="vs last month"
+              {...comparisonProps(comparisons?.rejected)}
+              lowerIsBetter
               onClick={() => navigate('/app/applications?status=Rejected')}
             />
             <StatCard

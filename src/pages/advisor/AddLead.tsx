@@ -35,7 +35,10 @@ import {
   LOAN_PURPOSES,
   SERVICES,
 } from '@/lib/constants';
+import { getDocumentChecklist, isMandatoryDoc } from '@/data/documentationData';
 import { cn, formatCurrency, maskId, uid } from '@/lib/utils';
+import { payoutRangeFromRateCard } from '@/lib/finance';
+import { usePayoutRateCard } from '@/hooks/usePayoutRateCard';
 import {
   EMPTY_CUSTOMER,
   EMPTY_EMPLOYMENT,
@@ -43,6 +46,8 @@ import {
   useData,
 } from '@/store/DataContext';
 import { useAuth } from '@/store/AuthContext';
+import { CATEGORY_DESCRIPTIONS, CATEGORY_DOCUMENTS, SERVICE_CATEGORIES, categoryFor, validateCategoryFields, type ServiceCategory } from '../../../shared/service-categories';
+import { CategoryFields, CategoryDetails } from '@/components/crm/CategoryFields';
 import type {
   CustomerInfo,
   EmploymentInfo,
@@ -94,7 +99,8 @@ export function AddLead() {
   const navigate = useNavigate();
   const toast = useToast();
   const { user } = useAuth();
-  const { submitApplication, saveDraft, applicationById, lenders, productFor } = useData();
+  const { submitApplication, saveDraft, applicationById, lenders } = useData();
+  const { entries: payoutRateCard } = usePayoutRateCard();
   const lenderOptions = lenders.filter((lender) => lender.status === 'Active').map((lender) => lender.name);
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('edit');
@@ -103,6 +109,7 @@ export function AddLead() {
   const [customer, setCustomer] = useState<CustomerInfo>(EMPTY_CUSTOMER);
   const [employment, setEmployment] = useState<EmploymentInfo>(EMPTY_EMPLOYMENT);
   const [details, setDetails] = useState<ServiceDetails>(EMPTY_SERVICE_DETAILS);
+  const [category, setCategory] = useState<ServiceCategory | ''>('');
   const [uploads, setUploads] = useState<UploadedFile[]>([]);
   const [errors, setErrors] = useState<Errors>({});
   const [declaration, setDeclaration] = useState(false);
@@ -118,7 +125,9 @@ export function AddLead() {
     if (!existing) return;
     setCustomer(existing.customer);
     setEmployment(existing.employment);
-    setDetails(existing.serviceDetails);
+    const existingCategory = categoryFor(existing.service, existing.serviceDetails.category);
+    setDetails({ ...existing.serviceDetails, category: existingCategory, categoryFields: existing.serviceDetails.categoryFields ?? {} });
+    setCategory(existingCategory);
   }, [editId, applicationById]);
 
   useEffect(() => {
@@ -126,7 +135,26 @@ export function AddLead() {
   }, [step]);
 
   const service = details.service as ServiceType | '';
-  const checklist = service ? DOCUMENT_CHECKLIST[service] : [];
+  // Pull the document checklist from the Documentation Required page data
+  const documentationChecklist = service
+    ? getDocumentChecklist(
+        service,
+        employment.employmentType,
+        employment.businessType,
+        details.insuranceType,
+      )
+    : undefined;
+  const checklist = (
+    category && category in CATEGORY_DOCUMENTS
+      ? CATEGORY_DOCUMENTS[category as keyof typeof CATEGORY_DOCUMENTS].map((doc) => ({
+          name: doc.displayName,
+          required: isMandatoryDoc(doc.displayName),
+        }))
+      : (documentationChecklist ?? (service ? DOCUMENT_CHECKLIST[service] : [])).map((doc) => ({
+          name: doc.name,
+          required: isMandatoryDoc(doc.name),
+        }))
+  );
   const requiredDocs = checklist.filter((c) => c.required);
   const uploadedNames = new Set(uploads.filter((u) => u.progress === 100).map((u) => u.name));
   const missingRequired = requiredDocs.filter((d) => !uploadedNames.has(d.name));
@@ -163,7 +191,7 @@ export function AddLead() {
         if (!customer.state) e.state = 'Select a state.';
         if (!PINCODE_RE.test(customer.pincode)) e.pincode = 'Enter a valid 6-digit pincode.';
       }
-      if (index === 1) {
+      if (index === 1 && category === 'Loan') {
         if (!employment.employmentType) e.employmentType = 'Select an employment type.';
         if (!employment.monthlyIncome || Number(employment.monthlyIncome) <= 0)
           e.monthlyIncome = 'Enter the monthly income.';
@@ -184,6 +212,7 @@ export function AddLead() {
         if (!details.service) e.service = 'Choose the service the customer needs.';
       }
       if (index === 3) {
+        if (category) Object.assign(e, validateCategoryFields(category, details.categoryFields));
         if (isLoanService(details.service)) {
           if (!details.loanAmount || Number(details.loanAmount) <= 0)
             e.loanAmount = 'Enter the required loan amount.';
@@ -196,7 +225,7 @@ export function AddLead() {
           if (!details.insuranceType) e.insuranceType = 'Select the insurance type.';
           if (!details.sumAssured) e.sumAssured = 'Enter the sum assured.';
         }
-        if (details.service === 'Other Financial Services' && !details.serviceNotes.trim())
+        if (details.service === 'Other Financial Services' && !category && !details.serviceNotes.trim())
           e.serviceNotes = 'Describe the service the customer needs.';
       }
       if (index === 4) {
@@ -208,7 +237,7 @@ export function AddLead() {
       }
       return e;
     },
-    [customer, employment, details, missingRequired.length, declaration],
+    [customer, employment, details, category, missingRequired.length, declaration],
   );
 
   const goNext = () => {
@@ -305,12 +334,15 @@ export function AddLead() {
     }
   };
 
-  const payoutProduct = service ? productFor(service) : undefined;
-  const estimatedPayout = payoutProduct
-    ? payoutProduct.flatPayout ?? Math.round(Number(details.loanAmount || 0) * payoutProduct.payoutRate) / 100
-    : 0;
+  const estimatedPayout = payoutRangeFromRateCard(payoutRateCard, service, Number(details.loanAmount || 0));
+  const estimatedPayoutText = estimatedPayout
+    ? estimatedPayout.minimum === estimatedPayout.maximum
+      ? formatCurrency(estimatedPayout.minimum)
+      : `${formatCurrency(estimatedPayout.minimum)} – ${formatCurrency(estimatedPayout.maximum)}`
+    : '';
 
   const resetForm = () => {
+    setCategory('');
     setCustomer(EMPTY_CUSTOMER);
     setEmployment(EMPTY_EMPLOYMENT);
     setDetails(EMPTY_SERVICE_DETAILS);
@@ -331,19 +363,33 @@ export function AddLead() {
     );
   }
 
+  if (!category) return <>
+    <PageHeader title="Add new lead" description="Choose the category to start the relevant application." />
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{SERVICE_CATEGORIES.map((option, index) =>
+      <button key={option} type="button" className="card-surface p-6 text-left hover:ring-2 hover:ring-brand-500 focus-visible:ring-2" onClick={() => {
+        setCategory(option);
+        setDetails({ ...EMPTY_SERVICE_DETAILS, category: option, categoryFields: {}, service: option === 'Loan' ? '' : option === 'Insurance' ? 'Insurance' : 'Other Financial Services' });
+        setEmployment(EMPTY_EMPLOYMENT); setUploads([]); setErrors({}); setDeclaration(false); setStep(0);
+      }}>
+        <span className="text-sm text-brand-600">{index + 1}</span>
+        <h2 className="mt-2 text-lg font-semibold">{option}</h2>
+        <p className="mt-2 text-sm text-slate-500">{CATEGORY_DESCRIPTIONS[option]}</p>
+      </button>)}</div>
+  </>;
+
   return (
     <div ref={topRef}>
       <PageHeader
-        title={editId ? `Edit lead ${editId}` : 'Add new lead'}
+        title={editId ? `Edit lead ${editId}` : `Add new lead · ${category}`}
         description="Capture the customer, pick a service, attach the paperwork and submit it to the Cibilon processing desk."
         actions={
-          <Button
+          <div className="flex gap-2"><Button variant="secondary" onClick={() => setCategory('')}>Change category</Button><Button
             variant="secondary"
             icon={<Save className="size-4" />}
             onClick={() => void doSaveDraft()}
           >
             Save as draft
-          </Button>
+          </Button></div>
         }
       />
 
@@ -405,17 +451,20 @@ export function AddLead() {
             <StepCustomer customer={customer} errors={errors} onChange={setCustomerField} />
           )}
           {step === 1 && (
-            <StepEmployment
+            category === 'Loan' ? <StepEmployment
               employment={employment}
               errors={errors}
               onChange={setEmploymentField}
-            />
+            /> : <p className="text-sm text-slate-600">Employment and bank details are not required for this enquiry. Continue to the category details; the processing desk can request supporting information if needed.</p>
           )}
           {step === 2 && (
-            <StepService value={details.service} error={errors.service} onChange={(v) => setDetailField('service', v)} />
+            category === 'Loan' ? <StepService value={details.service} error={errors.service} onChange={(v) => { setDetails({ ...EMPTY_SERVICE_DETAILS, category: 'Loan', categoryFields: {}, service: v }); setUploads([]); setDeclaration(false); }} />
+              : <div><SectionTitle>{category}</SectionTitle><p className="text-sm text-slate-600">{CATEGORY_DESCRIPTIONS[category]}</p></div>
           )}
           {step === 3 && (
-            <StepDetails details={details} errors={errors} lenderOptions={lenderOptions} onChange={setDetailField} />
+            <><StepDetails details={details} errors={errors} lenderOptions={lenderOptions} onChange={setDetailField} />
+              <div className="mt-5"><CategoryFields category={category} values={details.categoryFields ?? {}} errors={errors} onChange={(key, value) => { setDetailField('categoryFields', { ...details.categoryFields, [key]: value }); setErrors((prev) => ({ ...prev, [key]: '' })); }} /></div>
+            </>
           )}
           {step === 4 && (
             <StepDocuments
@@ -491,9 +540,9 @@ export function AddLead() {
               desk. You will be able to track it, but customer details can only be edited if the desk
               sends the file back.
             </span>
-            {estimatedPayout > 0 && (
+            {estimatedPayout && (
               <span className="mt-3 block rounded-lg bg-money-50 px-3 py-2 text-[13px] text-money-700">
-                Estimated payout on disbursal: {formatCurrency(estimatedPayout)}
+                Expected payout range on disbursal: {estimatedPayoutText}
               </span>
             )}
           </>
@@ -856,7 +905,7 @@ function StepService({
   return (
     <div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {SERVICES.map((option) => {
+        {SERVICES.filter((option) => categoryFor(option) === 'Loan').map((option) => {
           const Icon = SERVICE_ICONS[option];
           const active = value === option;
           return (
@@ -893,23 +942,26 @@ function StepService({
       </div>
       {error && <p className="mt-3 text-xs text-rose-600">{error}</p>}
 
-      {value && (
-        <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
-          <p className="text-[13px] font-semibold text-slate-800">
-            Documents required for {value}
-          </p>
-          <ul className="mt-2 flex flex-wrap gap-1.5">
-            {DOCUMENT_CHECKLIST[value as ServiceType].map((doc) => (
-              <li key={doc.name}>
-                <Chip tone={doc.required ? 'brand' : 'neutral'}>
-                  {doc.name}
-                  {doc.required && <span className="text-rose-500">*</span>}
-                </Chip>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {value && (() => {
+        const previewDocs = getDocumentChecklist(value, 'Salaried') ?? DOCUMENT_CHECKLIST[value as ServiceType];
+        return (
+          <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <p className="text-[13px] font-semibold text-slate-800">
+              Documents required for {value}
+            </p>
+            <ul className="mt-2 flex flex-wrap gap-1.5">
+              {previewDocs.map((doc) => (
+                <li key={doc.name}>
+                  <Chip tone={doc.required ? 'brand' : 'neutral'}>
+                    {doc.name}
+                    {doc.required && <span className="text-rose-500">*</span>}
+                  </Chip>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -1092,7 +1144,7 @@ function StepDetails({
             ? 'Describe the service required'
             : 'Additional notes for the processing desk'
         }
-        required={service === 'Other Financial Services'}
+        required={service === 'Other Financial Services' && !details.category}
         rows={3}
         placeholder="Anything the ops team should know — urgency, co-applicant, existing relationship with a lender…"
         value={details.serviceNotes}
@@ -1256,7 +1308,7 @@ function StepReview({
   employment: EmploymentInfo;
   details: ServiceDetails;
   uploads: UploadedFile[];
-  estimatedPayout: number;
+  estimatedPayout: ReturnType<typeof payoutRangeFromRateCard>;
   declaration: boolean;
   declarationError?: string;
   onDeclarationChange: (value: boolean) => void;
@@ -1281,7 +1333,7 @@ function StepReview({
         />
       </ReviewSection>
 
-      <ReviewSection title="Employment & financials" onEdit={() => onJump(1)}>
+      {categoryFor(details.service, details.category) === 'Loan' && <ReviewSection title="Employment & financials" onEdit={() => onJump(1)}>
         <DetailItem label="Employment type" value={employment.employmentType} />
         <DetailItem
           label="Monthly income"
@@ -1305,9 +1357,11 @@ function StepReview({
         <DetailItem label="Bank" value={employment.bankName} />
         <DetailItem label="Account" value={maskId(employment.accountNumber)} mono />
         <DetailItem label="IFSC" value={employment.ifsc} mono />
-      </ReviewSection>
+      </ReviewSection>}
 
       <ReviewSection title="Service requested" onEdit={() => onJump(2)}>
+        <DetailItem label="Category" value={categoryFor(details.service, details.category)} />
+        <CategoryDetails category={categoryFor(details.service, details.category)} values={details.categoryFields} />
         <DetailItem label="Service" value={details.service} />
         {loan && (
           <>
@@ -1364,16 +1418,18 @@ function StepReview({
         )}
       </ReviewSection>
 
-      {estimatedPayout > 0 && (
+      {estimatedPayout && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-money-500/20 bg-money-50 px-4 py-3.5">
           <div className="flex items-center gap-2.5">
             <Wallet className="size-4 text-money-700" />
             <p className="text-[13px] font-medium text-money-700">
-              Estimated payout on disbursal
+              Expected payout range on disbursal
             </p>
           </div>
           <p className="tnum text-lg font-semibold text-money-700">
-            {formatCurrency(estimatedPayout)}
+            {estimatedPayout.minimum === estimatedPayout.maximum
+              ? formatCurrency(estimatedPayout.minimum)
+              : `${formatCurrency(estimatedPayout.minimum)} – ${formatCurrency(estimatedPayout.maximum)}`}
           </p>
         </div>
       )}

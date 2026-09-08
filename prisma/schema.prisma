@@ -787,6 +787,25 @@ model CommissionRule {
   @@map("commission_rules")
 }
 
+model PayoutRateCardEntry {
+  id             String   @id @default(uuid()) @db.Uuid
+  sourceKey      String   @unique @map("source_key") @db.VarChar(120)
+  categoryId     String   @map("category_id") @db.VarChar(80)
+  categoryName   String   @map("category_name") @db.VarChar(120)
+  providerName   String   @map("provider_name") @db.VarChar(240)
+  productName    String   @map("product_name") @db.VarChar(500)
+  payoutText     String   @map("payout_text") @db.VarChar(120)
+  percentageRate Decimal? @map("percentage_rate") @db.Decimal(9, 6)
+  notes          String?  @db.VarChar(1000)
+  sortOrder      Int      @default(0) @map("sort_order")
+  effectiveMonth String   @default("JULY-2025") @map("effective_month") @db.VarChar(40)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([categoryId, sortOrder])
+  @@map("payout_rate_card_entries")
+}
+
 model Payout {
   id                String                    @id @default(uuid()) @db.Uuid
   payoutNumber      String                    @unique @map("payout_number") @db.VarChar(40)

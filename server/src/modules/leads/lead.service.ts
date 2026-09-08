@@ -1,6 +1,7 @@
 import type { Prisma } from '../../../generated/prisma/client.js';
 import { AppError, conflict, notFound } from '../../common/errors.js';
 import { DOCUMENT_CHECKLISTS, LOAN_SERVICE_TYPES } from '../../common/domain.js';
+import { CATEGORY_DOCUMENTS, categoryFor, validateCategoryFields } from '../../../../shared/service-categories.js';
 import { prisma } from '../../lib/prisma.js';
 import { encryptSensitive, lastFour, maskedLastFour } from '../../lib/sensitive-data.js';
 import type { RequestUser } from '../../types/express.js';
@@ -490,8 +491,15 @@ function assertConvertible(lead: Prisma.LeadGetPayload<{ include: { customer: tr
   if (lead.serviceType && LOAN_SERVICE_TYPES.has(lead.serviceType) && !lead.requestedAmount) {
     missing.push('requestedAmount');
   }
+  const service = (lead.serviceData ?? {}) as Record<string, unknown>;
+  const category = categoryFor(lead.serviceType ?? '', service.category);
+  if (service.category && service.category !== category) missing.push('serviceDetails.category');
+  if (service.category) {
+    const errors = validateCategoryFields(category, (service.categoryFields ?? {}) as Record<string, string>);
+    missing.push(...Object.keys(errors).map((key) => `serviceDetails.categoryFields.${key}`));
+  }
   const employment = (lead.employmentData ?? {}) as Record<string, unknown>;
-  for (const field of [
+  for (const field of (category === 'Loan' || !service.category ? [
     'employmentType',
     'monthlyIncome',
     'organisation',
@@ -499,11 +507,10 @@ function assertConvertible(lead: Prisma.LeadGetPayload<{ include: { customer: tr
     'existingLoans',
     'bankName',
     'ifsc',
-  ]) {
+  ] : [])) {
     if (!employment[field]) missing.push(`employment.${field}`);
   }
-  if (!lead.bankAccountEncrypted) missing.push('employment.accountNumber');
-  const service = (lead.serviceData ?? {}) as Record<string, unknown>;
+  if ((category === 'Loan' || !service.category) && !lead.bankAccountEncrypted) missing.push('employment.accountNumber');
   if (lead.serviceType && LOAN_SERVICE_TYPES.has(lead.serviceType)) {
     if (!service.tenure) missing.push('serviceDetails.tenure');
     if (!service.purpose) missing.push('serviceDetails.purpose');
@@ -515,7 +522,7 @@ function assertConvertible(lead: Prisma.LeadGetPayload<{ include: { customer: tr
     if (!service.insuranceType) missing.push('serviceDetails.insuranceType');
     if (!service.sumAssured) missing.push('serviceDetails.sumAssured');
   }
-  if (lead.serviceType === 'Other Financial Services' && !service.serviceNotes) {
+  if (lead.serviceType === 'Other Financial Services' && !service.category && !service.serviceNotes) {
     missing.push('serviceDetails.serviceNotes');
   }
   if (missing.length > 0) {
@@ -608,7 +615,16 @@ export async function convertLead(
         metadata: { leadId: lead.id, applicationNumber },
       },
     });
-    const checklist = DOCUMENT_CHECKLISTS[serviceType as keyof typeof DOCUMENT_CHECKLISTS];
+    const category = categoryFor(serviceType, (lead.serviceData as Record<string, unknown> | null)?.category);
+    const configuredDocuments = await tx.productDocument.findMany({
+      where: { product: { serviceType } },
+      orderBy: [{ sortOrder: 'asc' }, { displayName: 'asc' }],
+    });
+    const checklist = category in CATEGORY_DOCUMENTS && (lead.serviceData as Record<string, unknown> | null)?.category
+      ? CATEGORY_DOCUMENTS[category as keyof typeof CATEGORY_DOCUMENTS]
+      : configuredDocuments.length
+        ? configuredDocuments
+        : DOCUMENT_CHECKLISTS[serviceType as keyof typeof DOCUMENT_CHECKLISTS];
     if (!checklist) throw new AppError(422, 'INVALID_SERVICE_TYPE', 'Unsupported service type');
     await tx.documentRequest.createMany({
       data: checklist.map((item) => ({

@@ -95,6 +95,34 @@ test('Phase 8 security and business-rule integration suite', async (t) => {
     await request('/audit-logs', { token: admin });
   });
 
+  await t.test('PDF payout rate card is available to advisors and editable only by admins', async () => {
+    await request('/payout-rate-card', { expected: 401 });
+    const published = await request('/payout-rate-card', { token: advisor });
+    const personalLoanRates = published.payload.data
+      .filter((item: { categoryName: string; percentageRate: string | null }) => item.categoryName === 'Personal Loan' && item.percentageRate !== null)
+      .map((item: { percentageRate: string }) => Number(item.percentageRate));
+    assert.equal(Math.min(...personalLoanRates), 0.8);
+    assert.equal(Math.max(...personalLoanRates), 4);
+    await request('/payout-rate-card', {
+      token: advisor,
+      method: 'POST',
+      expected: 403,
+      body: { categoryId: 'personal-loan', categoryName: 'Personal Loan', providerName: 'Blocked Bank', productName: 'Blocked', payoutText: '1.00%', percentageRate: 1 },
+    });
+    const created = await request('/payout-rate-card', {
+      token: admin,
+      method: 'POST',
+      expected: 201,
+      body: { categoryId: 'personal-loan', categoryName: 'Personal Loan', providerName: 'Integration Bank', productName: 'Test product', payoutText: '1.25%', percentageRate: 1.25 },
+    });
+    const updated = await request(`/payout-rate-card/${created.payload.data.id}`, {
+      token: admin,
+      method: 'PATCH',
+      body: { payoutText: '1.30%', percentageRate: 1.3 },
+    });
+    assert.equal(updated.payload.data.percentageRate, '1.3');
+  });
+
   const stamp = Date.now();
   const secondEmail = `phase8.advisor.${stamp}@example.test`;
   const secondAdvisorBody = {
@@ -186,6 +214,135 @@ test('Phase 8 security and business-rule integration suite', async (t) => {
 
   const converted = await request(`/leads/${lead.id}/convert`, { token: advisor, method: 'POST', expected: 201, body: { remarks: 'Phase 8 workflow test' } });
   const application = converted.payload.data;
+
+  await t.test('monthly comparisons use scoped database totals and require authentication', async () => {
+    await request('/reports/monthly-comparisons', { expected: 401 });
+    const { comparisonPeriods } = await import('../src/modules/reports/monthly-comparison.js');
+    const identity = await request('/me', { token: advisor });
+    const result = await request('/reports/monthly-comparisons', { token: advisor });
+    const periods = comparisonPeriods(new Date(result.payload.data.asOf));
+    const expected = await prisma.lead.count({ where: {
+      advisorId: identity.payload.data.advisorId,
+      createdAt: { gte: periods.currentStart, lt: periods.asOf },
+    } });
+    assert.equal(result.payload.data.leads.current, expected);
+    assert(result.payload.data.leads.current >= 1);
+    const ownEmpty = await request('/reports/monthly-comparisons', { token: secondAdvisor });
+    assert.equal(ownEmpty.payload.data.leads.current, 0);
+    const network = await request('/reports/monthly-comparisons', { token: admin });
+    assert(network.payload.data.leads.current >= expected);
+    const catalog = await request('/products?pageSize=100', { token: advisor });
+    const personalLoan = catalog.payload.data.find((item: { serviceType: string }) => item.serviceType === 'Personal Loan');
+    assert(personalLoan.commissionOptions.length >= 1);
+    assert.equal(personalLoan.commissionOptions[0].calculationType, 'PERCENTAGE');
+  });
+
+  await t.test('admin document templates drive new application checklists', async () => {
+    const catalog = await request('/products?pageSize=100', { token: admin });
+    const insurance = catalog.payload.data.find((item: { serviceType: string }) => item.serviceType === 'Insurance');
+    await request(`/products/${insurance.id}`, {
+      token: admin,
+      method: 'PATCH',
+      body: { documents: [
+        { documentType: 'identity_proof', displayName: 'Identity Proof', required: true },
+        { documentType: 'policy_copy', displayName: 'Existing Policy Copy', required: false },
+      ] },
+    });
+    const insuranceLead = await request('/leads', {
+      token: advisor,
+      method: 'POST',
+      expected: 201,
+      body: {
+        customer: {
+          fullName: `Insurance Customer ${stamp}`, mobile: `9${String(stamp).slice(-9)}`,
+          email: `insurance.customer.${stamp}@example.test`, dateOfBirth: '1992-05-12',
+          gender: 'OTHER', pan: 'QRSTU1234V', aadhaar: `7${String(stamp).slice(-11)}`,
+          addressLine: '12 Policy Road', city: 'Pune', state: 'Maharashtra', pincode: '411001',
+        },
+        serviceType: 'Insurance',
+        serviceDetails: {
+          category: 'Insurance', insuranceType: 'Health Insurance', sumAssured: 500000,
+          categoryFields: { insuredPerson: 'Self', coverageNeeds: 'Family health protection', existingCover: 'No' },
+        },
+        source: 'Catalog document test',
+      },
+    });
+    const convertedInsurance = await request(`/leads/${insuranceLead.payload.data.id}/convert`, {
+      token: advisor, method: 'POST', expected: 201, body: {},
+    });
+    const checklist = await request(`/applications/${convertedInsurance.payload.data.id}/documents`, { token: advisor });
+    assert.deepEqual(checklist.payload.data.map((item: { displayName: string }) => item.displayName), [
+      'Identity Proof', 'Existing Policy Copy',
+    ]);
+  });
+
+  await t.test('admin payout rules are published to the advisor catalog', async () => {
+    const catalog = await request('/products?pageSize=100', { token: admin });
+    const homeLoan = catalog.payload.data.find((item: { serviceType: string }) => item.serviceType === 'Home Loan');
+    const lenderId = homeLoan.lenders[0].lenderId;
+    await request(`/products/${homeLoan.id}/commission-rules`, {
+      token: admin,
+      method: 'POST',
+      expected: 201,
+      body: { lenderId, calculationType: 'PERCENTAGE', percentageRate: 3.9, effectiveFrom: new Date().toISOString() },
+    });
+    const published = await request(`/products/${homeLoan.id}`, { token: advisor });
+    const option = published.payload.data.commissionOptions.find((item: { lenderId: string | null }) => item.lenderId === lenderId);
+    assert.equal(option.percentageRate, '3.9');
+  });
+
+  await t.test('category-specific lead converts without loan employment data and creates its checklist', async () => {
+    const categoryLead = await request('/leads', {
+      token: advisor,
+      method: 'POST',
+      expected: 201,
+      body: {
+        customer: {
+          fullName: `Category Customer ${stamp}`,
+          mobile: `6${String(stamp).slice(-9)}`,
+          email: `category.customer.${stamp}@example.test`,
+          dateOfBirth: '1988-04-20', gender: 'OTHER', pan: 'LMNOP6789Q',
+          aadhaar: `8${String(stamp).slice(-11)}`, addressLine: '21 Category Road',
+          city: 'Hyderabad', state: 'Telangana', pincode: '500001',
+        },
+        serviceType: 'Other Financial Services',
+        serviceDetails: {
+          category: 'CIBIL Repair',
+          categoryFields: {
+            repairService: 'Incorrect account or payment information',
+            currentScore: '690',
+            creditIssue: 'A closed account is shown as overdue.',
+            previousDispute: 'No',
+          },
+        },
+        source: 'Category integration suite',
+      },
+    });
+    const convertedCategory = await request(`/leads/${categoryLead.payload.data.id}/convert`, {
+      token: advisor, method: 'POST', expected: 201, body: { remarks: 'Category workflow test' },
+    });
+    assert.equal(convertedCategory.payload.data.serviceSnapshot.category, 'CIBIL Repair');
+    assert.equal(convertedCategory.payload.data.serviceSnapshot.categoryFields.currentScore, '690');
+    const checklist = await request(`/applications/${convertedCategory.payload.data.id}/documents`, { token: advisor });
+    assert.deepEqual(checklist.payload.data.map((item: { displayName: string }) => item.displayName), [
+      'PAN Card', 'Aadhaar Card', 'Address Proof', 'Credit Report (if available)', 'Dispute Supporting Documents',
+    ]);
+    const categoryLenders = await request('/lenders?status=ACTIVE&pageSize=1', { token: admin });
+    await request(`/applications/${convertedCategory.payload.data.id}/status`, {
+      token: admin,
+      method: 'PATCH',
+      body: {
+        status: 'APPROVED',
+        lenderId: categoryLenders.payload.data[0].id,
+        remarks: 'Category application approved without an artificial loan amount',
+      },
+    });
+    const categoryPayouts = await request(
+      `/payouts?applicationId=${convertedCategory.payload.data.id}`,
+      { token: advisor },
+    );
+    assert.equal(categoryPayouts.payload.data.length, 0);
+  });
 
   await t.test('staff can see only an application assigned to them', async () => {
     const before = await request('/applications?pageSize=100', { token: createdStaffToken });

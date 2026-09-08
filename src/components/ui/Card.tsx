@@ -19,7 +19,7 @@ export function CardHeader({ title, subtitle, action, className }: CardHeaderPro
   return (
     <header
       className={cn(
-        'flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3.5 sm:px-5',
+        'flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5',
         className,
       )}
     >
@@ -40,7 +40,7 @@ export function CardFooter({ className, children }: { className?: string; childr
   return (
     <footer
       className={cn(
-        'flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 sm:px-5',
+        'flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3.5 sm:px-5',
         className,
       )}
     >

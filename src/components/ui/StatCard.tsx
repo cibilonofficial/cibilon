@@ -8,6 +8,7 @@ interface StatCardProps {
   icon: ReactNode;
   /** Signed percentage; positive renders green, negative renders red. */
   delta?: number;
+  lowerIsBetter?: boolean;
   deltaLabel?: string;
   footnote?: ReactNode;
   tone?: 'neutral' | 'brand' | 'money' | 'warn' | 'danger' | 'info';
@@ -28,6 +29,7 @@ export function StatCard({
   value,
   icon,
   delta,
+  lowerIsBetter = false,
   deltaLabel,
   footnote,
   tone = 'neutral',
@@ -38,15 +40,15 @@ export function StatCard({
     <Wrapper
       onClick={onClick}
       className={cn(
-        'card-surface w-full p-4 text-left transition-shadow',
-        onClick && 'hover:shadow-raised focus-visible:shadow-raised',
+        'card-surface w-full p-5 text-left transition-all duration-200',
+        onClick && 'hover:-translate-y-1 hover:shadow-raised focus-visible:shadow-raised',
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <p className="text-[13px] font-medium text-slate-500">{label}</p>
         <span
           className={cn(
-            'flex size-8 shrink-0 items-center justify-center rounded-lg',
+            'flex size-10 shrink-0 items-center justify-center rounded-2xl',
             ICON_TONES[tone],
           )}
         >
@@ -62,10 +64,10 @@ export function StatCard({
             <span
               className={cn(
                 'inline-flex items-center gap-0.5 rounded font-medium',
-                delta >= 0 ? 'text-money-700' : 'text-rose-600',
+                delta === 0 ? 'text-slate-500' : ((delta > 0) !== lowerIsBetter ? 'text-money-700' : 'text-rose-600'),
               )}
             >
-              {delta >= 0 ? (
+              {delta === 0 ? null : delta > 0 ? (
                 <ArrowUpRight className="size-3.5" />
               ) : (
                 <ArrowDownRight className="size-3.5" />
@@ -73,7 +75,7 @@ export function StatCard({
               {Math.abs(delta)}%
             </span>
           )}
-          <span className="truncate text-slate-500">{deltaLabel ?? footnote}</span>
+          <span className="text-slate-500">{deltaLabel ?? footnote}</span>
         </div>
       )}
     </Wrapper>

@@ -23,6 +23,7 @@ import {
   getAdvisorReport,
   getApplicationReport,
   getDashboard,
+  getMonthlyComparisons,
   getExportJob,
   getExportJobForDownload,
   getLenderReport,
@@ -41,6 +42,10 @@ function auditData(req: Request) {
 
 export const reportRouter = Router();
 reportRouter.use(authenticate);
+
+reportRouter.get('/monthly-comparisons', requireAnyPermission('reports:read:self', 'reports:read:any'), async (req, res) => {
+  res.json({ data: await getMonthlyComparisons(req.user!) });
+});
 
 reportRouter.get('/dashboard/admin', requirePermission('reports:read:any'), validate({ query: dashboardQuerySchema }), async (req, res) => {
   res.json({ data: await getDashboard(dashboardQuerySchema.parse(req.query), req.user!) });

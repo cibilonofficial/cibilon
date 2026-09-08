@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 export function Skeleton({ className }: { className?: string }) {
-  return <div className={cn('animate-pulse rounded-md bg-slate-200/70', className)} />;
+  return <div className={cn('animate-pulse rounded-xl bg-slate-200/70', className)} />;
 }
 
 export function TableSkeleton({ rows = 6, cols = 6 }: { rows?: number; cols?: number }) {

@@ -146,10 +146,14 @@ export async function createPayoutForApproval(
   occurredAt: Date,
 ) {
   const amount = Number(application.requestedAmount?.toString() ?? 0);
-  if (amount <= 0) throw conflict('A requested amount is required to estimate the payout');
   const { commissionRule, payoutAmount } = await resolveCommission(
     tx, application.serviceType, lenderId, amount, occurredAt,
   );
+  // Some service categories (for example CIBIL repair and registrations) do
+  // not have a meaningful requested amount. A flat rule can still be
+  // estimated at approval, but a percentage rule needs an actual transaction
+  // value and is therefore deferred until disbursal.
+  if (amount <= 0 && commissionRule.calculationType === 'PERCENTAGE') return null;
   const payout = await tx.payout.create({
     data: {
       payoutNumber: `PO-${application.applicationNumber}`,

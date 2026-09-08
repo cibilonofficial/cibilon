@@ -89,7 +89,7 @@ export function AppLayout({ role }: { role: Role }) {
   };
 
   return (
-    <div className="flex min-h-dvh bg-slate-50">
+    <div className="flex min-h-dvh bg-slate-50/55">
       {/* Desktop sidebar */}
       <aside
         className={cn(
@@ -142,10 +142,10 @@ export function AppLayout({ role }: { role: Role }) {
           onOpenDrawer={() => setDrawerOpen(true)}
           onOpenSearch={() => setSearchOpen(true)}
         />
-        <main className="min-w-0 flex-1 px-3 py-5 sm:px-5 lg:px-7">
+        <main className="min-w-0 flex-1 px-3 py-6 sm:px-5 lg:px-8 lg:py-7">
           <div className="mx-auto w-full max-w-[1400px]">
             {error && (
-              <div className="mb-4 flex items-center justify-between rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+              <div className="mb-4 flex items-center justify-between rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 shadow-card">
                 <span>{error}</span>
                 <button className="font-medium underline" onClick={() => void refresh()}>Retry</button>
               </div>
@@ -155,7 +155,7 @@ export function AppLayout({ role }: { role: Role }) {
           </div>
         </main>
         <footer className="border-t border-slate-200 px-5 py-4 text-center text-xs text-slate-400">
-          Cibilon Pvt. Ltd. · Advisor CRM
+          Cibilon · Advisor CRM
         </footer>
       </div>
 

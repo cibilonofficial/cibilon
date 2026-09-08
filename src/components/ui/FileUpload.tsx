@@ -77,7 +77,7 @@ export function Dropzone({
         if (e.key === 'Enter' || e.key === ' ') inputRef.current?.click();
       }}
       className={cn(
-        'flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed text-center transition-colors',
+        'flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed text-center transition-all',
         compact ? 'gap-1 px-4 py-5' : 'gap-2 px-6 py-10',
         dragging
           ? 'border-brand-500 bg-brand-50/70'
@@ -119,8 +119,8 @@ interface UploadRowProps {
 export function UploadRow({ file, onRemove, onReplace }: UploadRowProps) {
   const uploading = file.progress < 100;
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-slate-100">
+    <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3.5 py-3 shadow-sm">
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-slate-100">
         <FileTypeIcon fileType={file.fileType} />
       </span>
 

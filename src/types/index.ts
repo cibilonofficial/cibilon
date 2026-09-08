@@ -86,6 +86,8 @@ export interface EmploymentInfo {
 }
 
 export interface ServiceDetails {
+  category?: import('../../shared/service-categories.js').ServiceCategory;
+  categoryFields?: Record<string, string>;
   service: ServiceType | '';
   /** Loan-shaped services. */
   loanAmount: string;
@@ -294,9 +296,31 @@ export interface ProductConfig {
   payoutRate: number;
   /** Flat rupee payout for products without an amount. */
   flatPayout: number | null;
+  commissionOptions?: {
+    id: string;
+    lenderId: string | null;
+    lenderName: string;
+    calculationType: 'PERCENTAGE' | 'FLAT';
+    percentageRate: number | null;
+    flatAmount: number | null;
+    effectiveFrom: string;
+  }[];
   documents: { name: string; required: boolean }[];
   eligibility: string[];
   lenderIds: string[];
+}
+
+export interface PayoutRateCardEntry {
+  id: string;
+  categoryId: string;
+  categoryName: string;
+  providerName: string;
+  productName: string;
+  payoutText: string;
+  percentageRate: number | null;
+  notes: string | null;
+  sortOrder: number;
+  effectiveMonth: string;
 }
 
 /* ------------------------------------------------------------------ */

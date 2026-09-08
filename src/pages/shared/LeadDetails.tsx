@@ -28,6 +28,8 @@ import { LEAD_STAGES } from '@/lib/constants';
 import { formatCurrency, formatDate, formatDateTime, maskId, relativeTime } from '@/lib/utils';
 import { useAuth } from '@/store/AuthContext';
 import { useData } from '@/store/DataContext';
+import { categoryFor } from '../../../shared/service-categories';
+import { CategoryDetails } from '@/components/crm/CategoryFields';
 import type { LeadActivityKind, LeadStage } from '@/types';
 
 const ACTIVITY_KINDS: LeadActivityKind[] = ['Call', 'Meeting', 'Email', 'Note'];
@@ -202,6 +204,8 @@ export function LeadDetails() {
                     value={lead.serviceDetails.tenure ? `${lead.serviceDetails.tenure} months` : '—'}
                   />
                   <DetailItem label="Purpose" value={lead.serviceDetails.purpose} />
+                  <DetailItem label="Category" value={categoryFor(lead.service, lead.serviceDetails.category)} />
+                  <CategoryDetails category={categoryFor(lead.service, lead.serviceDetails.category)} values={lead.serviceDetails.categoryFields} />
                   <DetailItem label="Preferred lender" value={lead.lender} />
                   <DetailItem label="Source" value={lead.source} />
                 </dl>

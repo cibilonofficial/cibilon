@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CalendarRange, Download, Hourglass, TrendingUp, Wallet } from 'lucide-react';
+import { BadgePercent, CalendarRange, Download, Hourglass, TrendingUp, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { EmptyState, TableSkeleton } from '@/components/ui/Feedback';
@@ -26,8 +26,10 @@ import { PAYOUT_STATUSES } from '@/lib/constants';
 import { formatCompactCurrency, formatCurrency, formatDate, matchesQuery } from '@/lib/utils';
 import { useAuth } from '@/store/AuthContext';
 import { useData } from '@/store/DataContext';
+import { useMonthlyComparisons } from '@/hooks/useMonthlyComparisons';
 
 export function Payouts() {
+  const comparisons = useMonthlyComparisons();
   const navigate = useNavigate();
   const toast = useToast();
   const { user } = useAuth();
@@ -97,13 +99,22 @@ export function Payouts() {
         title="Payouts"
         description="What you have earned, what is on the way, and what has already been credited."
         actions={
-          <Button
-            variant="secondary"
-            icon={<Download className="size-4" />}
-            onClick={() => toast.info('Statement queued', 'Your payout statement will be emailed.')}
-          >
-            Download statement
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="secondary"
+              icon={<BadgePercent className="size-4 text-brand-600" />}
+              onClick={() => navigate('/app/payout-structure')}
+            >
+              Payout Structure (July 2025)
+            </Button>
+            <Button
+              variant="secondary"
+              icon={<Download className="size-4" />}
+              onClick={() => toast.info('Statement queued', 'Your payout statement will be emailed.')}
+            >
+              Download statement
+            </Button>
+          </div>
         }
       />
 
@@ -130,12 +141,12 @@ export function Payouts() {
           footnote="Credited to your bank account"
         />
         <StatCard
-          label="This month"
-          value={formatCompactCurrency(totals.thisMonth)}
+          label="Paid this month"
+          value={comparisons ? formatCompactCurrency(comparisons.paid.current) : '—'}
           icon={<CalendarRange className="size-4" />}
           tone="neutral"
-          delta={18}
-          deltaLabel="vs last month"
+          delta={comparisons?.paid.percent ?? undefined}
+          footnote={comparisons ? `${formatCompactCurrency(comparisons.paid.previous)} paid last month (IST)` : 'Monthly comparison unavailable'}
         />
       </div>
 

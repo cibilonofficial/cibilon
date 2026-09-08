@@ -4,17 +4,27 @@ export function LogoMark({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        'flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-900',
+        'flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white p-0.5 shadow-sm ring-1 ring-slate-200/80',
         className,
       )}
       aria-hidden
     >
-      <svg viewBox="0 0 24 24" className="size-5" fill="none">
-        <path d="M5 17V7h2.6v7.6H12V17H5Z" fill="#ffffff" />
-        <rect x="14.4" y="7" width="2.6" height="10" rx="0.4" fill="#2fa27a" />
-        <rect x="18.4" y="10" width="2.2" height="7" rx="0.4" fill="#ffffff" opacity="0.55" />
-      </svg>
+      <img
+        src="/cibilon-logo.png"
+        alt="Cibilon Logo"
+        className="size-full object-contain"
+      />
     </span>
+  );
+}
+
+export function LogoFull({ className }: { className?: string }) {
+  return (
+    <img
+      src="/cibilon-logo.png"
+      alt="Cibilon — Better Credit. Better Opportunities."
+      className={cn('h-24 w-auto object-contain', className)}
+    />
   );
 }
 
@@ -32,10 +42,10 @@ export function Wordmark({
       <LogoMark />
       {!compact && (
         <span className="min-w-0">
-          <span className="block truncate text-[15px] font-semibold leading-tight tracking-tight text-slate-900">
+          <span className="block truncate text-[15px] font-bold leading-tight tracking-tight text-[#0b2447]">
             Cibilon
           </span>
-          <span className="block truncate text-[11px] leading-tight text-slate-400">
+          <span className="block truncate text-[11px] font-medium leading-tight text-slate-400">
             {subtitle ?? 'Advisor CRM'}
           </span>
         </span>

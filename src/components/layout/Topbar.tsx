@@ -36,11 +36,11 @@ export function Topbar({ user, onOpenDrawer, onOpenSearch }: TopbarProps) {
   }, []);
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-slate-200 bg-white/90 px-3 backdrop-blur sm:gap-3 sm:px-5">
+    <header className="sticky top-0 z-30 mx-2 mt-2 flex h-14 shrink-0 items-center gap-2 rounded-2xl border border-white/80 bg-white/88 px-3 shadow-card ring-1 ring-slate-200/70 backdrop-blur-xl sm:gap-3 sm:px-4 lg:mx-4 lg:mt-3">
       <button
         type="button"
         onClick={onOpenDrawer}
-        className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 lg:hidden"
+        className="rounded-xl p-2 text-slate-500 transition-colors hover:bg-slate-100 lg:hidden"
         aria-label="Open navigation"
       >
         <Menu className="size-5" />
@@ -49,7 +49,7 @@ export function Topbar({ user, onOpenDrawer, onOpenSearch }: TopbarProps) {
       <button
         type="button"
         onClick={onOpenSearch}
-        className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-left text-sm text-slate-400 transition-colors hover:border-slate-300 hover:bg-white sm:max-w-md"
+        className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-xl border border-slate-200/80 bg-slate-50/80 px-3.5 text-left text-sm text-slate-400 transition-all hover:border-brand-200 hover:bg-white hover:shadow-sm sm:max-w-md"
       >
         <Search className="size-4 shrink-0" />
         <span className="truncate">Search applications, customers, payouts…</span>
@@ -63,7 +63,7 @@ export function Topbar({ user, onOpenDrawer, onOpenSearch }: TopbarProps) {
           <button
             type="button"
             onClick={() => setBellOpen((v) => !v)}
-            className="relative rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100"
+            className="relative rounded-xl p-2 text-slate-500 transition-colors hover:bg-slate-100"
             aria-label={`Notifications (${unread.length} unread)`}
           >
             <Bell className="size-5" />
@@ -75,7 +75,7 @@ export function Topbar({ user, onOpenDrawer, onOpenSearch }: TopbarProps) {
           </button>
 
           {bellOpen && (
-            <div className="absolute right-0 top-12 z-40 w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-overlay animate-slide-up">
+            <div className="absolute right-0 top-12 z-40 w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-overlay animate-slide-up">
               <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
                 <p className="text-sm font-semibold text-slate-900">Notifications</p>
                 <span className="text-xs text-slate-500">{unread.length} unread</span>
@@ -137,7 +137,7 @@ export function Topbar({ user, onOpenDrawer, onOpenSearch }: TopbarProps) {
           <button
             type="button"
             onClick={() => setMenuOpen((v) => !v)}
-            className="flex items-center gap-2 rounded-lg p-1 pr-1.5 transition-colors hover:bg-slate-100"
+            className="flex items-center gap-2 rounded-xl p-1 pr-1.5 transition-colors hover:bg-slate-100"
           >
             <Avatar
               name={user.name}
@@ -156,7 +156,7 @@ export function Topbar({ user, onOpenDrawer, onOpenSearch }: TopbarProps) {
           </button>
 
           {menuOpen && (
-            <div className="absolute right-0 top-12 z-40 w-60 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-overlay animate-slide-up">
+            <div className="absolute right-0 top-12 z-40 w-60 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-overlay animate-slide-up">
               <div className="border-b border-slate-200 px-4 py-3">
                 <p className="truncate text-sm font-semibold text-slate-900">{user.name}</p>
                 <p className="truncate text-xs text-slate-500">{user.email}</p>

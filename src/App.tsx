@@ -32,6 +32,9 @@ import { AdminReports } from '@/pages/admin/AdminReports';
 import { AdminTeam } from '@/pages/admin/AdminTeam';
 
 import { ApplicationDetails } from '@/pages/shared/ApplicationDetails';
+import { PayoutStructure } from '@/pages/advisor/PayoutStructure';
+import { RequiredDocuments } from '@/pages/advisor/RequiredDocuments';
+import { EmiCalculator } from '@/pages/shared/EmiCalculator';
 import { LeadDetails } from '@/pages/shared/LeadDetails';
 import { Notifications } from '@/pages/shared/Notifications';
 import { StaffApplications } from '@/pages/staff/StaffApplications';
@@ -57,7 +60,10 @@ export default function App() {
                 <Route path="applications" element={<Applications />} />
                 <Route path="applications/:id" element={<ApplicationDetails />} />
                 <Route path="documents" element={<Documents />} />
+                <Route path="documentation-required" element={<RequiredDocuments />} />
                 <Route path="payouts" element={<Payouts />} />
+                <Route path="payout-structure" element={<PayoutStructure />} />
+                <Route path="emi-calculator" element={<EmiCalculator />} />
                 <Route path="notifications" element={<Notifications />} />
                 <Route path="profile" element={<Profile />} />
                 <Route path="support" element={<Support />} />
@@ -86,6 +92,9 @@ export default function App() {
                 <Route path="team" element={<AdminTeam />} />
                 <Route path="lenders" element={<AdminLenders />} />
                 <Route path="products" element={<AdminProducts />} />
+                <Route path="payout-structure" element={<PayoutStructure />} />
+                <Route path="documentation-required" element={<RequiredDocuments />} />
+                <Route path="emi-calculator" element={<EmiCalculator />} />
                 <Route path="payouts" element={<AdminPayouts />} />
                 <Route path="reports" element={<AdminReports />} />
                 <Route path="notifications" element={<Notifications />} />

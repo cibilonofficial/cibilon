@@ -16,6 +16,7 @@ import { auditRouter } from './modules/audit/audit.routes.js';
 import { authRouter } from './modules/auth/auth.routes.js';
 import { advisorRouter } from './modules/advisors/advisor.routes.js';
 import { lenderRouter, productRouter } from './modules/catalog/catalog.routes.js';
+import { rateCardRouter } from './modules/rate-card/rate-card.routes.js';
 import { applicationRouter } from './modules/applications/application.routes.js';
 import { customerRouter } from './modules/customers/customer.routes.js';
 import { applicationDocumentRouter, documentRouter } from './modules/documents/document.routes.js';
@@ -108,6 +109,7 @@ export function createApp() {
   app.use('/api/v1/advisors', advisorRouter);
   app.use('/api/v1/lenders', lenderRouter);
   app.use('/api/v1/products', productRouter);
+  app.use('/api/v1/payout-rate-card', rateCardRouter);
   app.use('/api/v1/applications', applicationRouter);
   app.use('/api/v1/applications', applicationDocumentRouter);
   app.use('/api/v1/documents', documentRouter);

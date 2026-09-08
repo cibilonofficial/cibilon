@@ -47,7 +47,7 @@ export function Pagination({
             <select
               value={pageSize}
               onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs text-slate-700 focus:border-brand-500 focus:outline-none"
+              className="h-9 rounded-xl border border-slate-300 bg-white px-2.5 text-xs text-slate-700 focus:border-brand-500 focus:outline-none"
             >
               {[10, 25, 50].map((n) => (
                 <option key={n} value={n}>
@@ -63,7 +63,7 @@ export function Pagination({
             type="button"
             onClick={() => onPageChange(page - 1)}
             disabled={page <= 1}
-            className="inline-flex size-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-transparent"
+            className="inline-flex size-9 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-transparent"
             aria-label="Previous page"
           >
             <ChevronLeft className="size-4" />
@@ -81,7 +81,7 @@ export function Pagination({
                 onClick={() => onPageChange(entry)}
                 aria-current={entry === page ? 'page' : undefined}
                 className={cn(
-                  'inline-flex size-8 items-center justify-center rounded-md text-[13px] font-medium transition-colors',
+                  'inline-flex size-9 items-center justify-center rounded-full text-[13px] font-medium transition-colors',
                   entry === page
                     ? 'bg-brand-900 text-white'
                     : 'text-slate-600 hover:bg-slate-100',
@@ -96,7 +96,7 @@ export function Pagination({
             type="button"
             onClick={() => onPageChange(page + 1)}
             disabled={page >= lastPage}
-            className="inline-flex size-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-transparent"
+            className="inline-flex size-9 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-transparent"
             aria-label="Next page"
           >
             <ChevronRight className="size-4" />

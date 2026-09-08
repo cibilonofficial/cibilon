@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Field';
-import { LogoMark } from '@/components/layout/Logo';
 import { apiRequest, errorMessage } from '@/lib/api';
 
 export function ForgotPassword() {
@@ -37,14 +36,12 @@ export function ForgotPassword() {
   return (
     <div className="flex min-h-dvh items-center justify-center bg-slate-50 px-5 py-10">
       <div className="w-full max-w-sm">
-        <div className="mb-8 flex items-center gap-3">
-          <LogoMark />
-          <div>
-            <p className="text-[15px] font-semibold leading-tight text-slate-900">
-              Cibilon
-            </p>
-            <p className="text-[11px] leading-tight text-slate-400">Advisor CRM</p>
-          </div>
+        <div className="mb-6 flex flex-col items-center text-center">
+          <img
+            src="/cibilon-logo.png"
+            alt="Cibilon — Better Credit. Better Opportunities."
+            className="h-24 w-auto rounded-xl object-contain drop-shadow-sm"
+          />
         </div>
 
         <div className="card-surface p-6">

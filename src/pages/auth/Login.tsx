@@ -7,13 +7,12 @@ import {
   EyeOff,
   Lock,
   Mail,
+  BriefcaseBusiness,
   ShieldCheck,
-  TrendingUp,
-  Users,
+  UserRound,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Checkbox, Input } from '@/components/ui/Field';
-import { LogoMark } from '@/components/layout/Logo';
 import { useAuth } from '@/store/AuthContext';
 
 export function Login() {
@@ -28,6 +27,7 @@ export function Login() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{ identifier?: string; password?: string }>({});
+  const [signInType, setSignInType] = useState<'advisor' | 'staff'>('advisor');
 
   const homeFor = (role: 'admin' | 'advisor' | 'staff') =>
     role === 'admin' ? '/admin/dashboard' : role === 'staff' ? '/staff/applications' : '/app/dashboard';
@@ -58,89 +58,74 @@ export function Login() {
   };
 
   return (
-    <div className="grid min-h-dvh lg:grid-cols-[1.05fr_1fr]">
-      {/* Brand panel */}
-      <aside className="relative hidden flex-col justify-between bg-brand-950 px-12 py-12 text-white lg:flex">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-[0.07]"
-          style={{
-            backgroundImage:
-              'linear-gradient(to right, #ffffff 1px, transparent 1px), linear-gradient(to bottom, #ffffff 1px, transparent 1px)',
-            backgroundSize: '48px 48px',
-          }}
-        />
+    <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-brand-50/70 via-white to-money-50/50 px-4 py-8 sm:px-6">
+      <div className="pointer-events-none absolute -left-28 -top-28 size-80 rounded-full bg-brand-200/25 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-36 -right-24 size-96 rounded-full bg-money-100/45 blur-3xl" />
+      <div className="w-full max-w-[420px]">
+        {/* Cibilon Logo above the login card */}
+        <div className="mb-6 flex flex-col items-center text-center">
+          <img
+            src="/cibilon-logo.png"
+            alt="Cibilon — Better Credit. Better Opportunities."
+            className="h-28 w-auto object-contain sm:h-32"
+          />
+        </div>
 
-        <div className="relative flex items-center gap-3">
-          <LogoMark className="bg-white/10 ring-1 ring-white/15" />
+        {/* Centered Login Card */}
+        <div className="relative rounded-3xl border border-white/90 bg-white/88 p-6 shadow-overlay ring-1 ring-slate-200/70 backdrop-blur-xl sm:p-8">
+          <div
+            className="mb-6 grid grid-cols-2 gap-1.5 rounded-2xl bg-slate-100 p-1.5"
+            aria-label="Choose sign in type"
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setSignInType('advisor');
+                setError(null);
+              }}
+              aria-pressed={signInType === 'advisor'}
+              className={`inline-flex h-11 items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-all ${
+                signInType === 'advisor'
+                  ? 'bg-white text-brand-900 shadow-card ring-1 ring-slate-200'
+                  : 'text-slate-500 hover:bg-white/60 hover:text-slate-800'
+              }`}
+            >
+              <UserRound className="size-4" />
+              Advisor
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSignInType('staff');
+                setError(null);
+              }}
+              aria-pressed={signInType === 'staff'}
+              className={`inline-flex h-11 items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-all ${
+                signInType === 'staff'
+                  ? 'bg-white text-brand-900 shadow-card ring-1 ring-slate-200'
+                  : 'text-slate-500 hover:bg-white/60 hover:text-slate-800'
+              }`}
+            >
+              <BriefcaseBusiness className="size-4" />
+              Staff
+            </button>
+          </div>
+
           <div>
-            <p className="text-[15px] font-semibold leading-tight">
-              Cibilon
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              {signInType === 'advisor' ? 'Advisor sign in' : 'Staff sign in'}
+            </h1>
+            <p className="mt-1.5 text-sm text-slate-500">
+              {signInType === 'advisor'
+                ? 'Use the credentials issued by your Cibilon relationship manager.'
+                : 'Use the credentials issued by your Cibilon administrator.'}
             </p>
-            <p className="text-[11px] leading-tight text-white/50">Advisor CRM</p>
           </div>
-        </div>
-
-        <div className="relative max-w-md">
-          <h1 className="text-3xl font-semibold leading-tight tracking-tight">
-            One workspace for every loan file you source.
-          </h1>
-          <p className="mt-4 text-[15px] leading-relaxed text-white/65">
-            Submit leads, upload KYC, track processing stage by stage and see exactly what you have
-            earned — without a single follow-up call to the ops desk.
-          </p>
-
-          <dl className="mt-10 grid grid-cols-3 gap-6 border-t border-white/10 pt-8">
-            <div>
-              <dt className="text-[11px] uppercase tracking-wider text-white/45">Partner DSAs</dt>
-              <dd className="tnum mt-1 text-2xl font-semibold">2,400+</dd>
-            </div>
-            <div>
-              <dt className="text-[11px] uppercase tracking-wider text-white/45">Disbursed</dt>
-              <dd className="tnum mt-1 text-2xl font-semibold">₹840Cr</dd>
-            </div>
-            <div>
-              <dt className="text-[11px] uppercase tracking-wider text-white/45">Lenders</dt>
-              <dd className="tnum mt-1 text-2xl font-semibold">38</dd>
-            </div>
-          </dl>
-        </div>
-
-        <ul className="relative flex flex-wrap gap-x-6 gap-y-2 text-xs text-white/50">
-          <li className="flex items-center gap-1.5">
-            <ShieldCheck className="size-3.5" /> 256-bit encrypted
-          </li>
-          <li className="flex items-center gap-1.5">
-            <Users className="size-3.5" /> RBI-compliant DSA network
-          </li>
-          <li className="flex items-center gap-1.5">
-            <TrendingUp className="size-3.5" /> Real-time payout tracking
-          </li>
-        </ul>
-      </aside>
-
-      {/* Form panel */}
-      <main className="flex items-center justify-center bg-white px-5 py-10 sm:px-10">
-        <div className="w-full max-w-sm">
-          <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <LogoMark />
-            <div>
-              <p className="text-[15px] font-semibold leading-tight text-slate-900">
-                Cibilon
-              </p>
-              <p className="text-[11px] leading-tight text-slate-400">Advisor CRM</p>
-            </div>
-          </div>
-
-          <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Advisor sign in</h2>
-          <p className="mt-1.5 text-sm text-slate-500">
-            Use the credentials issued by your Cibilon relationship manager.
-          </p>
 
           {error && (
             <div
               role="alert"
-              className="mt-5 flex items-start gap-2.5 rounded-lg border border-rose-200 bg-rose-50 px-3.5 py-3"
+              className="mt-5 flex items-start gap-2.5 rounded-2xl border border-rose-200 bg-rose-50 px-3.5 py-3"
             >
               <AlertCircle className="mt-0.5 size-4 shrink-0 text-rose-600" />
               <p className="text-[13px] leading-snug text-rose-800">{error}</p>
@@ -152,7 +137,7 @@ export function Login() {
               label="Email or mobile number"
               type="text"
               autoComplete="username"
-              placeholder="advisor@ciblon.in"
+              placeholder={signInType === 'advisor' ? 'advisor@cibilon.in' : 'staff@cibilon.in'}
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               error={fieldErrors.identifier}
@@ -188,7 +173,7 @@ export function Login() {
               />
               <Link
                 to="/forgot-password"
-                className="text-[13px] font-medium text-brand-700 hover:text-brand-900 hover:underline"
+                className="text-[13px] font-medium text-brand-700 transition-colors hover:text-brand-900 hover:underline"
               >
                 Forgot password?
               </Link>
@@ -201,16 +186,25 @@ export function Login() {
               loading={submitting}
               iconRight={<ArrowRight className="size-4" />}
             >
-              {submitting ? 'Signing in…' : 'Login'}
+              {submitting
+                ? 'Signing in…'
+                : `Sign in as ${signInType === 'advisor' ? 'advisor' : 'staff'}`}
             </Button>
           </form>
+        </div>
 
-          <p className="mt-8 text-center text-xs leading-relaxed text-slate-400">
+        {/* Footer info */}
+        <div className="mt-6 text-center">
+          <p className="text-xs leading-relaxed text-slate-400">
             Access is restricted to empanelled Cibilon partners. Contact your relationship manager to
             have an account issued.
           </p>
+          <p className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-400">
+            <ShieldCheck className="size-3.5 text-emerald-600" />
+            256-bit encrypted · RBI-compliant DSA platform
+          </p>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

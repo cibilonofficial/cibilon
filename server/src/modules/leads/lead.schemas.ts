@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SERVICE_CATEGORIES } from '../../../../shared/service-categories.js';
 import { ACTIVITY_KINDS, LEAD_STAGES, SERVICE_TYPES } from '../../common/domain.js';
 import { createCustomerSchema, customerDraftSchema } from '../customers/customer.schemas.js';
 
@@ -37,6 +38,8 @@ export const employmentSchema = z
 
 export const serviceDetailsSchema = z
   .object({
+    category: z.enum(SERVICE_CATEGORIES).optional(),
+    categoryFields: z.record(z.string().max(60), z.string().trim().max(2000)).refine((value) => Object.keys(value).length <= 30, 'Too many category fields').optional(),
     tenure: z.string().trim().max(50).optional(),
     purpose: z.string().trim().max(160).optional(),
     preferredLender: z.string().trim().max(160).optional(),

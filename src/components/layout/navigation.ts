@@ -1,9 +1,12 @@
 import type { LucideIcon } from 'lucide-react';
 import {
+  BadgePercent,
   Bell,
   Boxes,
   Building2,
+  Calculator,
   ChartNoAxesCombined,
+  ClipboardCheck,
   FileStack,
   FileText,
   Handshake,
@@ -44,6 +47,14 @@ export const ADVISOR_NAV: NavGroup[] = [
       { label: 'Leads', to: '/app/leads', icon: ListChecks, end: true },
       { label: 'Applications', to: '/app/applications', icon: FileStack },
       { label: 'Add New Lead', to: '/app/leads/new', icon: UserPlus },
+    ],
+  },
+  {
+    label: 'Advisor Desk',
+    items: [
+      { label: 'Payout Structure', to: '/app/payout-structure', icon: BadgePercent },
+      { label: 'Documentation Required', to: '/app/documentation-required', icon: ClipboardCheck },
+      { label: 'EMI Calculator', to: '/app/emi-calculator', icon: Calculator },
     ],
   },
   {
@@ -88,6 +99,9 @@ export const ADMIN_NAV: NavGroup[] = [
   {
     label: 'Finance',
     items: [
+      { label: 'Payout Structure', to: '/admin/payout-structure', icon: BadgePercent },
+      { label: 'Documentation Required', to: '/admin/documentation-required', icon: ClipboardCheck },
+      { label: 'EMI Calculator', to: '/admin/emi-calculator', icon: Calculator },
       { label: 'Payout Management', to: '/admin/payouts', icon: Wallet, badge: 'pendingPayouts' },
       { label: 'Reports', to: '/admin/reports', icon: ChartNoAxesCombined },
     ],

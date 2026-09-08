@@ -93,7 +93,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 key={t.id}
                 role="status"
                 className={cn(
-                  'pointer-events-auto relative flex w-full max-w-sm items-start gap-3 overflow-hidden rounded-lg bg-white p-3.5 pl-5 shadow-raised ring-1 animate-slide-up',
+                  'pointer-events-auto relative flex w-full max-w-sm items-start gap-3 overflow-hidden rounded-2xl bg-white p-4 pl-5 shadow-raised ring-1 animate-slide-up',
                   style.ring,
                 )}
               >

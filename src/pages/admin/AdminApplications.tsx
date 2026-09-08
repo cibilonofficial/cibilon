@@ -29,6 +29,7 @@ import { formatCurrency, matchesQuery, relativeTime } from '@/lib/utils';
 import { useAuth } from '@/store/AuthContext';
 import { useData } from '@/store/DataContext';
 import type { Application, ApplicationStatus } from '@/types';
+import { SERVICE_CATEGORIES, categoryFor } from '../../../shared/service-categories';
 
 const TABS = [
   { id: 'all', label: 'All' },
@@ -61,6 +62,7 @@ export function AdminApplications() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [tab, setTab] = useState('all');
+  const [category, setCategory] = useState('all');
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('');
   const [service, setService] = useState('');
@@ -88,24 +90,26 @@ export function AdminApplications() {
   const filtered = useMemo(
     () =>
       applications
+        .filter((a) => Boolean(a.submittedAt))
+        .filter((a) => category === 'all' || categoryFor(a.service, a.serviceDetails.category) === category)
         .filter((a) => inTab(a, tab))
         .filter((a) =>
-          matchesQuery(query, a.id, a.customer.fullName, a.customer.mobile, a.advisorName, a.lender),
+          matchesQuery(query, a.id, a.customer.fullName, a.customer.mobile, a.advisorName, a.lender, categoryFor(a.service, a.serviceDetails.category)),
         )
         .filter((a) => (status ? a.status === status : true))
         .filter((a) => (service ? a.service === service : true))
         .filter((a) => (advisorFilter ? a.advisorName === advisorFilter : true))
         .sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt)),
-    [applications, tab, query, status, service, advisorFilter],
+    [applications, tab, query, status, service, advisorFilter, category],
   );
 
   const counts = useMemo(
     () =>
       TABS.reduce<Record<string, number>>((acc, t) => {
-        acc[t.id] = applications.filter((a) => inTab(a, t.id)).length;
+        acc[t.id] = applications.filter((a) => a.submittedAt && (category === 'all' || categoryFor(a.service, a.serviceDetails.category) === category) && inTab(a, t.id)).length;
         return acc;
       }, {}),
-    [applications],
+    [applications, category],
   );
 
   const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
@@ -140,6 +144,10 @@ export function AdminApplications() {
       />
 
       <Card>
+        <div className="px-4 pt-3 sm:px-5">
+          <Tabs tabs={[{ id: 'all', label: 'All categories', count: applications.filter((a) => a.submittedAt).length }, ...SERVICE_CATEGORIES.map((name) => ({ id: name, label: name, count: applications.filter((a) => a.submittedAt && categoryFor(a.service, a.serviceDetails.category) === name).length }))]}
+            active={category} onChange={(value) => { setCategory(value); setService(''); setPage(1); }} />
+        </div>
         <div className="px-4 pt-1 sm:px-5">
           <Tabs
             tabs={TABS.map((t) => ({ ...t, count: counts[t.id] }))}
@@ -215,7 +223,7 @@ export function AdminApplications() {
                   <TH>Application</TH>
                   <TH>Customer</TH>
                   <TH>Advisor</TH>
-                  <TH>Service</TH>
+                  <TH>Category / Service</TH>
                   <TH align="right">Amount</TH>
                   <TH>Lender</TH>
                   <TH>Status</TH>
@@ -254,7 +262,12 @@ export function AdminApplications() {
                             </span>
                           </span>
                         </TD>
-                        <TD>{app.service}</TD>
+                        <TD>
+                          <span className="block font-medium text-slate-800">
+                            {categoryFor(app.service, app.serviceDetails.category)}
+                          </span>
+                          <span className="block text-xs text-slate-500">{app.service}</span>
+                        </TD>
                         <TD align="right" className="tnum">
                           {app.loanAmount ? formatCurrency(app.loanAmount) : '—'}
                         </TD>
@@ -322,6 +335,7 @@ export function AdminApplications() {
                   subtitle={`${app.id} · ${app.advisorName}`}
                   badge={<StatusBadge status={app.status} />}
                   rows={[
+                    { label: 'Category', value: categoryFor(app.service, app.serviceDetails.category) },
                     { label: 'Service', value: app.service },
                     {
                       label: 'Amount',

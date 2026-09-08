@@ -3,6 +3,7 @@ import { forbidden, notFound } from '../../common/errors.js';
 import { prisma } from '../../lib/prisma.js';
 import type { RequestUser } from '../../types/express.js';
 import { scopedAdvisorId } from '../advisors/advisor-access.js';
+import { comparisonPeriods, compareMonths } from './monthly-comparison.js';
 import type {
   AdvisorReportQuery,
   ApplicationReportQuery,
@@ -23,6 +24,40 @@ function pagination(page: number, pageSize: number, total: number) {
 
 function numeric(value: { toString(): string } | null | undefined) {
   return value ? Number(value.toString()) : 0;
+}
+
+export async function getMonthlyComparisons(user: RequestUser) {
+  const advisorId = scopedAdvisorId(user, undefined, 'reports:read:any');
+  const scope = advisorId ? { advisorId } : {};
+  const periods = comparisonPeriods();
+  const measure = async (createdAt: { gte: Date; lt: Date }) => {
+    const [leads, approved, completed, rejected, paid] = await Promise.all([
+      prisma.lead.count({ where: { ...scope, createdAt } }),
+      prisma.application.count({
+        where: {
+          ...scope,
+          status: { in: ['APPROVED', 'DISBURSED'] },
+          statusHistory: { some: { toStatus: 'APPROVED', createdAt } },
+        },
+      }),
+      prisma.application.count({ where: { ...scope, status: 'DISBURSED', disbursedAt: createdAt } }),
+      prisma.application.count({ where: { ...scope, status: 'REJECTED', statusHistory: { some: { toStatus: 'REJECTED', createdAt } } } }),
+      prisma.payout.aggregate({ where: { ...scope, status: 'PAID', paidAt: createdAt }, _sum: { payoutAmount: true } }),
+    ]);
+    return { leads, approved, completed, rejected, paid: numeric(paid._sum.payoutAmount) };
+  };
+  const [current, previous] = await Promise.all([
+    measure({ gte: periods.currentStart, lt: periods.asOf }),
+    measure({ gte: periods.previousStart, lt: periods.currentStart }),
+  ]);
+  return {
+    timezone: 'Asia/Kolkata', asOf: periods.asOf,
+    leads: compareMonths(current.leads, previous.leads),
+    approved: compareMonths(current.approved, previous.approved),
+    completed: compareMonths(current.completed, previous.completed),
+    rejected: compareMonths(current.rejected, previous.rejected),
+    paid: compareMonths(current.paid, previous.paid),
+  };
 }
 
 function sortRows<T>(rows: T[], key: keyof T, order: 'asc' | 'desc') {

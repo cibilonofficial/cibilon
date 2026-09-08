@@ -98,7 +98,7 @@ export function Tabs({
             {tab.count !== undefined && (
               <span
                 className={cn(
-                  'tnum rounded px-1.5 py-0.5 text-[11px] font-semibold',
+                  'tnum rounded-full px-2 py-0.5 text-[11px] font-semibold',
                   isActive ? 'bg-brand-100 text-brand-800' : 'bg-slate-100 text-slate-500',
                 )}
               >

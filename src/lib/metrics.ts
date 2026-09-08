@@ -8,9 +8,9 @@ export const ACTIVE_STATUSES: ApplicationStatus[] = [
   'Processing',
   'Submitted to Lender',
   'Additional Information Required',
-  'Approved',
 ];
 
+export const APPROVED_STATUSES: ApplicationStatus[] = ['Approved', 'Disbursed', 'Completed'];
 export const COMPLETED_STATUSES: ApplicationStatus[] = ['Disbursed', 'Completed'];
 
 export const ADVISOR_ACTION_DOC_STATUSES = ['Pending', 'Re-upload Required', 'Rejected'] as const;
@@ -18,6 +18,7 @@ export const ADVISOR_ACTION_DOC_STATUSES = ['Pending', 'Re-upload Required', 'Re
 export interface Metrics {
   totalLeads: number;
   active: number;
+  approved: number;
   completed: number;
   rejected: number;
   drafts: number;
@@ -50,6 +51,7 @@ export function computeMetrics(
   return {
     totalLeads: applications.length,
     active: applications.filter((a) => ACTIVE_STATUSES.includes(a.status)).length,
+    approved: applications.filter((a) => APPROVED_STATUSES.includes(a.status)).length,
     completed: applications.filter((a) => COMPLETED_STATUSES.includes(a.status)).length,
     rejected: applications.filter((a) => a.status === 'Rejected').length,
     drafts: applications.filter((a) => a.status === 'Draft').length,

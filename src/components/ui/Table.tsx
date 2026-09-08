@@ -93,7 +93,7 @@ export function TD({
 
 /** Mobile replacement for a table row. */
 export function MobileCardList({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn('divide-y divide-slate-100', className)}>{children}</div>;
+  return <div className={cn('space-y-2 p-2', className)}>{children}</div>;
 }
 
 export function MobileRow({
@@ -114,7 +114,7 @@ export function MobileRow({
   return (
     <div
       onClick={onClick}
-      className={cn('p-4 transition-colors', onClick && 'cursor-pointer active:bg-slate-50')}
+      className={cn('rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-colors', onClick && 'cursor-pointer active:bg-slate-50')}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">

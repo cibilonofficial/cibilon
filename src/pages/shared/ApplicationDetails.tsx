@@ -44,6 +44,8 @@ import {
 } from '@/lib/utils';
 import { useAuth } from '@/store/AuthContext';
 import { useData } from '@/store/DataContext';
+import { categoryFor } from '../../../shared/service-categories';
+import { CategoryDetails } from '@/components/crm/CategoryFields';
 import type { AppDocument, ApplicationStatus } from '@/types';
 
 export function ApplicationDetails() {
@@ -363,6 +365,8 @@ export function ApplicationDetails() {
                   <SectionTitle>Service information</SectionTitle>
                   <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <DetailItem label="Service type" value={application.service} />
+                    <DetailItem label="Category" value={categoryFor(application.service, application.serviceDetails.category)} />
+                    <CategoryDetails category={categoryFor(application.service, application.serviceDetails.category)} values={application.serviceDetails.categoryFields} />
                     <DetailItem
                       label="Requested amount"
                       value={

@@ -89,7 +89,7 @@ export function AdminProfile() {
               <div>
                 <SectionTitle>Entity</SectionTitle>
                 <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <DetailItem label="Legal name" value="Cibilon Private Limited" />
+                  <DetailItem label="Business name" value="Cibilon" />
                   <DetailItem label="CIN" value="U65990MH2019PTC331204" mono />
                   <DetailItem label="GSTIN" value="27AAKCC7712R1ZQ" mono />
                   <DetailItem label="PAN" value="AAKCC7712R" mono />

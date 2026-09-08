@@ -36,7 +36,7 @@ export function Sidebar({
   const isCollapsed = collapsed && !mobile;
 
   return (
-    <div className="flex h-full flex-col border-r border-slate-200 bg-white">
+    <div className="flex h-full flex-col overflow-hidden rounded-r-3xl border-r border-slate-200/80 bg-white/95 shadow-raised backdrop-blur">
       <div
         className={cn(
           'flex h-16 shrink-0 items-center border-b border-slate-200 px-4',
@@ -49,7 +49,7 @@ export function Sidebar({
             navigate(role === 'admin' ? '/admin/dashboard' : role === 'staff' ? '/staff/applications' : '/app/dashboard');
             onNavigate?.();
           }}
-          className="min-w-0 rounded-lg text-left"
+          className="min-w-0 rounded-xl text-left"
         >
           <Wordmark
             compact={isCollapsed}
@@ -60,7 +60,7 @@ export function Sidebar({
           <button
             type="button"
             onClick={onNavigate}
-            className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
             aria-label="Close menu"
           >
             <X className="size-5" />
@@ -88,11 +88,11 @@ export function Sidebar({
                       title={isCollapsed ? item.label : undefined}
                       className={({ isActive }) =>
                         cn(
-                          'group relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors',
+                          'group relative flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium transition-all',
                           isCollapsed && 'justify-center px-0',
                           isActive
-                            ? 'bg-brand-50 text-brand-900'
-                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+                            ? 'bg-brand-50 text-brand-900 shadow-sm ring-1 ring-brand-100'
+                            : 'text-slate-600 hover:translate-x-0.5 hover:bg-slate-100 hover:text-slate-900',
                         )
                       }
                     >
@@ -108,7 +108,7 @@ export function Sidebar({
                           {!isCollapsed && count > 0 && (
                             <span
                               className={cn(
-                                'tnum rounded px-1.5 py-0.5 text-[11px] font-semibold',
+                                'tnum rounded-full px-1.5 py-0.5 text-[11px] font-semibold',
                                 isActive
                                   ? 'bg-brand-700 text-white'
                                   : 'bg-slate-200 text-slate-600',
@@ -137,7 +137,7 @@ export function Sidebar({
           onClick={onLogout}
           title={isCollapsed ? 'Logout' : undefined}
           className={cn(
-            'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-rose-50 hover:text-rose-700',
+            'flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-rose-50 hover:text-rose-700',
             isCollapsed && 'justify-center px-0',
           )}
         >
@@ -150,7 +150,7 @@ export function Sidebar({
             type="button"
             onClick={onToggleCollapse}
             className={cn(
-              'mt-1 flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-100',
+              'mt-1 flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-100',
               isCollapsed && 'justify-center px-0',
             )}
           >

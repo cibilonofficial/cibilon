@@ -3,6 +3,8 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import bcrypt from 'bcryptjs';
 import { PrismaClient, UserStatus } from '../server/generated/prisma/client.js';
 import { DOCUMENT_CHECKLISTS, SERVICE_TYPES } from '../server/src/common/domain.js';
+import { CIBILON_CONTACT, PAYOUT_DATA } from '../src/data/payoutStructureData.js';
+import { DOCUMENTATION_DATA } from '../src/data/documentationData.js';
 
 const connectionString = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
 if (!connectionString) throw new Error('DIRECT_URL or DATABASE_URL is required for seeding');
@@ -310,6 +312,35 @@ async function main() {
   );
   await seedDemoStaffPermissions(staff.id);
   await seedCatalog(admin.id);
+  const payoutEntries = PAYOUT_DATA.flatMap((category) => category.items.map((item, index) => ({
+    sourceKey: item.id, categoryId: category.id, categoryName: category.name,
+    providerName: item.lender, productName: item.product, payoutText: item.payout,
+    percentageRate: item.numericRate ?? null, notes: item.notes ?? null, sortOrder: index,
+    effectiveMonth: category.cycle || CIBILON_CONTACT.effectiveMonth,
+  })));
+  await prisma.payoutRateCardEntry.deleteMany();
+  await prisma.payoutRateCardEntry.createMany({ data: payoutEntries });
+  const serviceSources: Record<string, string[]> = {
+    'Personal Loan': ['personal-loan'], 'Business Loan': ['business-loan'], 'Home Loan': ['home-loan'],
+    'Loan Against Property': ['lap'], 'Vehicle Loan': ['car-loan'], Insurance: ['life-insurance', 'health-insurance'],
+  };
+  for (const [serviceType, sourceIds] of Object.entries(serviceSources)) {
+    const product = await prisma.product.findUnique({ where: { serviceType }, select: { id: true } });
+    if (!product) continue;
+    const byName = new Map<string, { name: string; required: boolean }>();
+    DOCUMENTATION_DATA.filter((category) => sourceIds.includes(category.id)).forEach((category) =>
+      category.variants.forEach((variant) => variant.sections.forEach((section) => section.items.forEach((item) => {
+        const key = item.name.trim().toLowerCase();
+        const current = byName.get(key);
+        byName.set(key, { name: item.name.trim(), required: Boolean(item.mandatory || current?.required) });
+      }))));
+    await prisma.productDocument.deleteMany({ where: { productId: product.id } });
+    const documents = [...byName.values()];
+    if (documents.length) await prisma.productDocument.createMany({ data: documents.map((item, sortOrder) => ({
+      productId: product.id, documentType: `reference_${sortOrder + 1}`, displayName: item.name,
+      required: item.required, sortOrder,
+    })) });
+  }
 }
 
 main()

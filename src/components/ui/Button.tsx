@@ -7,7 +7,7 @@ type Size = 'sm' | 'md' | 'lg' | 'icon';
 
 const VARIANTS: Record<Variant, string> = {
   primary:
-    'bg-brand-900 text-white hover:bg-brand-800 active:bg-brand-950 disabled:bg-brand-900/40 shadow-card',
+    'bg-brand-900 text-white hover:-translate-y-0.5 hover:bg-brand-800 hover:shadow-raised active:translate-y-0 active:bg-brand-950 disabled:bg-brand-900/40 shadow-card',
   secondary:
     'bg-white text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50 active:bg-slate-100 disabled:text-slate-400',
   ghost: 'bg-transparent text-slate-600 hover:bg-slate-100 active:bg-slate-200',
@@ -49,7 +49,7 @@ export function Button({
       {...rest}
       disabled={disabled || loading}
       className={cn(
-        'inline-flex items-center rounded-lg font-medium transition-colors',
+        'inline-flex items-center rounded-xl font-medium transition-all duration-200',
         'disabled:cursor-not-allowed disabled:opacity-70',
         variant !== 'link' && SIZES[size],
         VARIANTS[variant],
