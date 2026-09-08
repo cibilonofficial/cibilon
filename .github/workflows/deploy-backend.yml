@@ -1,0 +1,50 @@
+name: Deploy Backend → VPS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - 'prisma/**'
+      - 'shared/**'
+      - 'package*.json'
+      - 'tsconfig.server.json'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: root
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/cibilon
+
+            echo "── pulling latest code ──"
+            git pull --ff-only origin main
+
+            echo "── installing dependencies ──"
+            npm ci --prefer-offline
+
+            echo "── generating prisma client ──"
+            npm run db:generate
+
+            echo "── building API ──"
+            npm run build:api
+
+            echo "── running migrations ──"
+            set -a; source /opt/cibilon/.env.production; set +a
+            npx prisma migrate deploy
+
+            echo "── restarting services ──"
+            pm2 restart cibilon-api cibilon-worker
+
+            echo "── health check ──"
+            sleep 4
+            curl -sf http://127.0.0.1:4000/api/v1/health || (pm2 logs cibilon-api --lines 20 && exit 1)
+
+            echo "✅ Backend deployed"
