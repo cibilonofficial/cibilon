@@ -6,9 +6,11 @@ on:
     paths:
       - 'server/**'
       - 'prisma/**'
+      - 'prisma.config.ts'
       - 'shared/**'
       - 'package*.json'
       - 'tsconfig.server.json'
+      - '.github/workflows/deploy-backend.yml'
 
 jobs:
   test:
