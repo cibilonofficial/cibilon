@@ -1,5 +1,12 @@
-import 'dotenv/config';
+import { config } from 'dotenv';
+import { existsSync } from 'node:fs';
 import { defineConfig } from 'prisma/config';
+
+if (existsSync('.env.production') && process.env.NODE_ENV === 'production') {
+  config({ path: '.env.production' });
+} else {
+  config();
+}
 
 export default defineConfig({
   schema: 'prisma/schema.prisma',

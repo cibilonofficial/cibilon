@@ -97,7 +97,7 @@ jobs:
 
             echo "── running migrations ──"
             set -a; source /opt/cibilon/.env.production; set +a
-            npx prisma migrate deploy
+            DATABASE_URL=$DATABASE_URL DIRECT_URL=$DIRECT_URL npx prisma migrate deploy
 
             echo "── blue/green swap ──"
             pm2 reload cibilon-api --update-env
