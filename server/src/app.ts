@@ -29,6 +29,7 @@ import { staffRouter } from './modules/staff/staff.routes.js';
 import { supportRouter } from './modules/support/support.routes.js';
 
 export function createApp() {
+  // Cibilon API v1.0.0
   const app = express();
 
   if (env.TRUST_PROXY) app.set('trust proxy', 1);

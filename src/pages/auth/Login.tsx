@@ -201,7 +201,7 @@ export function Login() {
           </p>
           <p className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-400">
             <ShieldCheck className="size-3.5 text-emerald-600" />
-            256-bit encrypted · RBI-compliant DSA platform
+            256-bit encrypted · RBI-compliant DSA platform · v1.0.0
           </p>
         </div>
       </div>
