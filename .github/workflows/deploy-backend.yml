@@ -96,8 +96,8 @@ jobs:
             npm run build:api
 
             echo "── running migrations ──"
-            set -a; source /opt/cibilon/.env.production; set +a
-            DATABASE_URL="$(grep ^DATABASE_URL /opt/cibilon/.env.production | cut -d= -f2-)" npx prisma migrate deploy
+            export $(grep -v '^#' /opt/cibilon/.env.production | xargs)
+            npx prisma migrate deploy --schema /opt/cibilon/prisma/schema.prisma
 
             echo "── blue/green swap ──"
             pm2 reload cibilon-api --update-env
